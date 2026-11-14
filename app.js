@@ -176,6 +176,7 @@ function initializeApp() {
     setupAccessibleTabs(dom.personaTabs, (tabId) => {
       const roleMap = {
         'tab-ward-officer': 'ward_officer',
+        'tab-gig-worker': 'gig_worker',
         'tab-housing-society': 'housing_society',
         'tab-school': 'school'
       };

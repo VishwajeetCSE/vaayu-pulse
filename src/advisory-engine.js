@@ -1,12 +1,12 @@
 /**
  * @fileoverview Advisory & Delta Engine
- * Formulates persona-specific interventions (Ward Officers, RWAs, Schools),
- * calculates analytical snapshot deltas ("What Changed"), and synthesizes
- * multi-tier citizen advisories across reading levels and languages.
+ * Formulates persona-specific interventions (Ward Officers, Gig Workers/Delivery Fleets, RWAs, Schools),
+ * calculates analytical snapshot deltas ("What Changed"), and dynamically synthesizes
+ * multi-tier citizen advisories across reading levels and languages via a combinatorial rule engine.
  * @module advisory-engine
  */
 
-import { PERSONA_RULES, READING_LEVELS, I18N_TEMPLATES, AQI_BANDS } from './constants.js';
+import { PERSONA_RULES, READING_LEVELS, I18N_TEMPLATES, COMBINATORIAL_LEXICON, AQI_BANDS } from './constants.js';
 import { getAqiBand } from './aqi-engine.js';
 import { sanitizeString, escapeHTML } from './security.js';
 
@@ -16,7 +16,7 @@ import { sanitizeString, escapeHTML } from './security.js';
  * @param {number} maxAqi - Maximum AQI observed in the jurisdiction.
  * @param {number} avgAqi - Average AQI across all wards.
  * @param {Array<Object>} hotspots - Top identified hotspot zones.
- * @returns {Object} Structured checklists for ward_officer, housing_society, and school.
+ * @returns {Object} Structured checklists for ward_officer, gig_worker, housing_society, and school.
  */
 export function generatePersonaActions(maxAqi, avgAqi, hotspots = []) {
   const effectiveAqi = Math.max(maxAqi, avgAqi);
@@ -171,11 +171,11 @@ export function compareSnapshots(currentStations, previousSnapshot) {
 
   let summaryText = '';
   if (avgDelta > 10) {
-    summaryText = `Overall city air quality has deteriorated by an average of ${avgDelta} AQI points compared to the baseline snapshot (${previousSnapshot.title || 'Previous Snapshot'}). ${deterioratingCount} ward(s) show acute worsening.`;
+    summaryText = `Citywide air quality has deteriorated by an average of ${avgDelta} AQI points compared to the baseline snapshot (${previousSnapshot.title || 'Previous Snapshot'}). ${deterioratingCount} ward(s) show acute worsening.`;
   } else if (avgDelta < -10) {
-    summaryText = `Overall city air quality shows improvement with an average reduction of ${Math.abs(avgDelta)} AQI points compared to baseline. ${improvingCount} ward(s) improved.`;
+    summaryText = `Citywide air quality shows improvement with an average reduction of ${Math.abs(avgDelta)} AQI points compared to baseline. ${improvingCount} ward(s) improved.`;
   } else {
-    summaryText = `City-wide air quality remains relatively stable (net delta: ${avgDelta > 0 ? '+' : ''}${avgDelta} AQI points), with ${staticHotspotCount} persistent severe hotspots requiring ongoing intervention.`;
+    summaryText = `Citywide air quality remains relatively stable (net delta: ${avgDelta > 0 ? '+' : ''}${avgDelta} AQI points), with ${staticHotspotCount} persistent severe hotspots requiring ongoing intervention.`;
   }
 
   return {
@@ -192,29 +192,57 @@ export function compareSnapshots(currentStations, previousSnapshot) {
 }
 
 /**
+ * Synthesizes dynamic atmospheric dispersion commentary based on AQI and pollutants.
+ * @param {number} aqi
+ * @param {string} pollutant
+ * @returns {string}
+ */
+function getDynamicAtmosphericReport(aqi, pollutant) {
+  const condIdx = (Math.round(aqi) + pollutant.length) % COMBINATORIAL_LEXICON.atmosphericConditions.length;
+  const atmospheric = COMBINATORIAL_LEXICON.atmosphericConditions[condIdx];
+  const urgency = aqi >= 300
+    ? 'Critical emergency inversion response required'
+    : aqi >= 200
+    ? 'Heightened statutory particulate controls in effect'
+    : 'Routine dispersion surveillance active';
+
+  return `Current meteorological state exhibits ${atmospheric}. Regional transport vector identifies ${pollutant} accumulation. Directive: ${urgency}.`;
+}
+
+/**
  * Formats a Technical Internal Municipal Briefing Note.
  *
  * @param {Object} options
  * @param {number} options.avgAqi
  * @param {number} options.worstAqi
+ * @param {string} [options.dominantPollutant='PM2.5']
  * @param {Array<Object>} options.hotspots
  * @param {Object} options.deltaAnalysis
  * @param {Object} options.personaActions
  * @param {string} [options.lang='en']
- * @returns {string} Formatted markdown/plain-text technical briefing.
+ * @returns {string} Formatted technical briefing.
  */
-export function generateTechnicalBriefing({ avgAqi, worstAqi, hotspots, deltaAnalysis, personaActions, lang = 'en' }) {
+export function generateTechnicalBriefing({
+  avgAqi,
+  worstAqi,
+  dominantPollutant = 'PM2.5',
+  hotspots = [],
+  deltaAnalysis,
+  personaActions,
+  lang = 'en'
+}) {
   const i18n = I18N_TEMPLATES[lang] || I18N_TEMPLATES.en;
   const band = getAqiBand(avgAqi);
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const atmosphericNotes = getDynamicAtmosphericReport(avgAqi, dominantPollutant);
 
   let doc = `# ${i18n.internalBriefing.toUpperCase()}\n`;
   doc += `**Issuance Timestamp:** ${now} UTC | **Security Classification:** CIVIC EXECUTIVE RESTRICTED\n`;
-  doc += `**Citywide Average AQI:** ${avgAqi} (${band.category}) | **Peak Hotspot AQI:** ${worstAqi}\n\n`;
+  doc += `**Citywide Average AQI:** ${avgAqi} (${band.category}) | **Peak Hotspot AQI:** ${worstAqi} | **Dominant Vector:** ${dominantPollutant}\n\n`;
 
   doc += `## 1. SITUATION REPORT & EPIDEMIOLOGICAL THREAT VECTOR\n`;
   doc += `- **Health Risk Category:** ${band.healthRisk}\n`;
-  doc += `- **Atmospheric Dispersion State:** Inversion conditions trapping particulate matter at ground level.\n`;
+  doc += `- **Atmospheric Dispersion State:** ${atmosphericNotes}\n`;
   if (deltaAnalysis?.hasBaseline) {
     doc += `- **Delta Vector:** ${deltaAnalysis.summaryText}\n`;
   }
@@ -238,8 +266,17 @@ export function generateTechnicalBriefing({ avgAqi, worstAqi, hotspots, deltaAna
       });
   }
 
+  if (personaActions?.gig_worker) {
+    doc += `\n### B. Gig Workers, Delivery Fleets & Outdoor Labor (${personaActions.gig_worker.statutoryRef})\n`;
+    personaActions.gig_worker.actions
+      .filter((a) => a.isTriggered)
+      .forEach((a) => {
+        doc += `  [ ] [${a.priority}] ${a.text} (Target: ${a.timeframe} | Scope: ${a.scope})\n`;
+      });
+  }
+
   if (personaActions?.school) {
-    doc += `\n### B. Educational Institutions & Child Welfare (${personaActions.school.statutoryRef})\n`;
+    doc += `\n### C. Educational Institutions & Child Welfare (${personaActions.school.statutoryRef})\n`;
     personaActions.school.actions
       .filter((a) => a.isTriggered)
       .forEach((a) => {
@@ -248,7 +285,7 @@ export function generateTechnicalBriefing({ avgAqi, worstAqi, hotspots, deltaAna
   }
 
   if (personaActions?.housing_society) {
-    doc += `\n### C. Residential Welfare Associations & Societies\n`;
+    doc += `\n### D. Residential Welfare Associations & Housing Societies\n`;
     personaActions.housing_society.actions
       .filter((a) => a.isTriggered)
       .forEach((a) => {
@@ -257,15 +294,16 @@ export function generateTechnicalBriefing({ avgAqi, worstAqi, hotspots, deltaAna
   }
 
   doc += `\n## 4. INTER-AGENCY ENFORCEMENT TIMELINE\n`;
-  doc += `- **T+0 to T+2 Hours:** Deployment of misting trucks, traffic rerouting at choke-points.\n`;
-  doc += `- **T+2 to T+4 Hours:** Spot-checks on construction barriers and commercial DG usage.\n`;
+  doc += `- **T+0 to T+2 Hours:** Deployment of misting trucks, traffic rerouting at choke-points, and free N95 dispatch to delivery hubs.\n`;
+  doc += `- **T+2 to T+4 Hours:** Spot-checks on construction barriers, dark store clean air havens, and commercial DG usage.\n`;
   doc += `- **T+6 Hours:** Evening re-evaluation snapshot and public broadcast update.\n`;
 
   return doc;
 }
 
 /**
- * Formats a Plain-Language Citizen Advisory across selected reading levels and languages.
+ * Formats a Plain-Language Citizen Advisory across selected reading levels and languages
+ * with adaptive, combinatorial dynamic synthesis.
  *
  * @param {Object} options
  * @param {number} options.avgAqi
@@ -275,10 +313,28 @@ export function generateTechnicalBriefing({ avgAqi, worstAqi, hotspots, deltaAna
  * @param {string} [options.lang='en'] - 'en' | 'hi' | 'bn' | 'ta' | 'mr' | 'es'
  * @returns {string} Plain-language formatted advisory.
  */
-export function generateCitizenAdvisory({ avgAqi, dominantPollutant = 'PM2.5', hotspots = [], readingLevel = 'standard', lang = 'en' }) {
+export function generateCitizenAdvisory({
+  avgAqi,
+  dominantPollutant = 'PM2.5',
+  hotspots = [],
+  readingLevel = 'standard',
+  lang = 'en'
+}) {
   const i18n = I18N_TEMPLATES[lang] || I18N_TEMPLATES.en;
   const band = getAqiBand(avgAqi);
   const topHotspot = hotspots.length > 0 ? hotspots[0] : null;
+
+  // Pollutant health impact descriptor
+  let pollutantVectorNote = '';
+  if (dominantPollutant === 'PM2.5') {
+    pollutantVectorNote = 'Fine particles easily penetrate deep into lung bronchioles and cardiovascular circulation.';
+  } else if (dominantPollutant === 'PM10') {
+    pollutantVectorNote = 'Coarse dust causes acute upper respiratory tract congestion and conjunctival eye irritation.';
+  } else if (dominantPollutant === 'NO2') {
+    pollutantVectorNote = 'Combustion gases cause acute airway hyper-responsiveness and smog-induced headaches.';
+  } else {
+    pollutantVectorNote = 'Toxic emissions create persistent respiratory irritation across exposed outdoor populations.';
+  }
 
   // 1. SIMPLIFIED / CHILD-FRIENDLY (Grade 3-6)
   if (readingLevel === 'simplified') {
@@ -290,7 +346,7 @@ export function generateCitizenAdvisory({ avgAqi, dominantPollutant = 'PM2.5', h
 
 🛡️ **आज आपको क्या करना चाहिए?**
 1. 🏃 **बाहर दौड़ने से बचें:** खेल के मैदान में भारी दौड़-भाग वाले खेलों के बजाय कमरे के अंदर लूडो, कैरम या किताबें पढ़ें।
-2. 😷 **सुपरहीरो मास्क पहनें:** जब भी आप स्कूल बस के लिए या बाहर जाएं, अपना मास्क जरूर पहनें।
+2. 😷 **सुपरहीरो मास्क पहनें:** जब भी आप स्कूल बस के लिए या बाहर जाएं, अपना शील्ड मास्क (Shield Mask) जरूर पहनें।
 3. 💧 **खूब पानी पिएं:** दिन भर साफ पानी और नारियल पानी पिएं।
 4. 🪟 **खिड़कियां बंद रखें:** जब बाहर गाड़ियां ज्यादा चल रही हों, कमरे की खिड़की बंद रखें।`;
     }
@@ -312,7 +368,7 @@ export function generateCitizenAdvisory({ avgAqi, dominantPollutant = 'PM2.5', h
     return `📢 **KIDS & STUDENTS SPECIAL AIR ADVISORY**
 
 🌟 **What is our air like today?**
-Our city's air is currently in the **${band.category}** zone (Score: ${avgAqi} out of 500). Invisible tiny dust particles (called ${dominantPollutant}) are floating in the outdoor breeze.
+Our city's air is currently in the **${band.category}** zone (Score: ${avgAqi} out of 500). Invisible tiny dust particles (called ${dominantPollutant}) are floating in the outdoor breeze. ${pollutantVectorNote}
 
 🛡️ **Your Action Rules for Today:**
 1. 🏃 **Indoor Play Day:** Swap outdoor running and soccer with fun indoor games like chess, drawing, or reading.
@@ -321,24 +377,25 @@ Our city's air is currently in the **${band.category}** zone (Score: ${avgAqi} o
 4. 🪟 **Keep Windows Shut:** Close classroom and bedroom windows during morning and evening rush hour.`;
   }
 
-  // 2. VULNERABLE HEALTH FOCUS (Seniors, Asthma, Heart Patients, Pregnant Women)
+  // 2. VULNERABLE HEALTH FOCUS (Seniors, Asthma, Heart Patients, Pregnant Women, Outdoor Couriers)
   if (readingLevel === 'vulnerable') {
     if (lang === 'hi') {
-      return `🚨 **वरिष्ठ नागरिकों और श्वास रोगियों के लिए विशेष स्वास्थ्य परामर्श**
+      return `🚨 **वरिष्ठ नागरिकों, श्वास रोगियों और आउटडोर कामगारों के लिए विशेष स्वास्थ्य परामर्श**
 
 ⚠️ **वर्तमान जोखिम स्तर:** ${band.category} (AQI: ${avgAqi}) | मुख्य प्रदूषक: ${dominantPollutant}
 ${topHotspot ? `📍 *विशेष रूप से प्रभावित क्षेत्र:* ${topHotspot.ward} (AQI: ${topHotspot.aqi})` : ''}
 
-🩺 **अनिवार्य चिकित्सीय दिशा-निर्देश:**
+🩺 **अनिवार्य चिकित्सीय व सुरक्षा दिशा-निर्देश:**
 1. 🛑 **सुबह की सैर स्थगित करें:** सुबह और देर शाम बाहर टहलना बिल्कुल बंद रखें जब वायु प्रदूषण सबसे अधिक सघन रहता है।
 2. 💊 **दवाएं और इनहेलर साथ रखें:** अस्थमा और ब्रोंकाइटिस रोगी अपने रिलीफ इनहेलर को हर समय पास रखें और एक्सपायरी तिथि जांचें।
-3. 🏠 **स्वच्छ वायु कक्ष (Clean Air Sanctuary):** घर के एक कमरे में एयर प्यूरीफायर चालू रखें और दरवाजे-खिड़कियां बंद रखें।
-4. 🚨 **चेतावनी लक्षण:** यदि सीने में भारीपन, सांस फूलना, लगातार खांसी या चक्कर आए तो तुरंत नजदीकी स्वास्थ्य केंद्र से संपर्क करें।
-5. 😷 **N95/FFP2 मास्क:** यदि बाहर जाना अपरिहार्य हो, तो केवल प्रमाणित N95 मास्क का उपयोग करें।`;
+3. 🛵 **डिलीवरी व आउटडोर कामगार:** 2 घंटे से अधिक लगातार बाहर काम न करें; समय-समय पर एयर-प्यूरीफाइड शेल्टर में विश्राम लें।
+4. 🏠 **स्वच्छ वायु कक्ष (Clean Air Sanctuary):** घर के एक कमरे में एयर प्यूरीफायर चालू रखें और दरवाजे-खिड़कियां बंद रखें।
+5. 😷 **N95/FFP2 मास्क:** यदि बाहर जाना अपरिहार्य हो, तो केवल प्रमाणित N95 मास्क का उपयोग करें।
+6. 🚨 **चेतावनी लक्षण:** सीने में भारीपन, सांस फूलना या चक्कर आने पर तुरंत नजदीकी स्वास्थ्य केंद्र से संपर्क करें।`;
     }
 
     if (lang === 'bn') {
-      return `🚨 **বয়োজ্যেষ্ঠ ও শ্বাসকষ্টের রোগীদের জন্য বিশেষ স্বাস্থ্য সতর্কতা**
+      return `🚨 **বয়োজ্যেষ্ঠ, শ্বাসকষ্টের রোগী ও আউটডোর কর্মীদের জন্য বিশেষ স্বাস্থ্য সতর্কতা**
 
 ⚠️ **বর্তমান ঝুঁকির মাত্রা:** ${band.category} (AQI: ${avgAqi}) | প্রধান দূষক: ${dominantPollutant}
 ${topHotspot ? `📍 *অতিরিক্ত দূষিত অঞ্চল:* ${topHotspot.ward} (AQI: ${topHotspot.aqi})` : ''}
@@ -347,24 +404,25 @@ ${topHotspot ? `📍 *অতিরিক্ত দূষিত অঞ্চল:*
 1. 🛑 **ভোরের প্রাতর্ভ্রমণ বন্ধ রাখুন:** ভোর ও সন্ধ্যায় বাইরের বায়ুতে বিষাক্ত কণার ঘনত্ব বেশি থাকে, তাই বাইরে হাঁটবেন না।
 2. 💊 **ইনহেলার ও ওষুধ প্রস্তুত রাখুন:** শ্বাসকষ্টের রোগীরা সর্বক্ষণ প্রয়োজনীয় ওষুধ সাথে রাখুন।
 3. 🏠 **ঘরের ভেতরের বায়ু পরিষ্কার রাখুন:** জানালা বন্ধ রেখে এয়ার পিউরিফায়ার ব্যবহার করুন।
-4. 🚨 **বিপদ সংকেত:** বুকে চাপ, তীব্র শ্বাসকষ্ট বা মাথা ঘোরার অনুভূতি হলে তৎক্ষণাৎ চিকিৎসকের পরামর্শ নিন।
+4. 🛵 **ডেলিভারি ও ফিল্ড কর্মীদের সুরক্ষা:** একটানা রোদে ও ধোঁয়ায় কাজ না করে ছায়াযুক্ত বিশুদ্ধ বায়ুর স্থানে বিশ্রাম নিন।
 5. 😷 **সার্টিফায়েড N95 মাস্ক:** বাইরে যেতে বাধ্য হলে সাধারণ কাপড়ের মাস্ক নয়, N95 মাস্ক ব্যবহার করুন।`;
     }
 
     // Default English Vulnerable
     return `🚨 **SPECIAL MEDICAL & VULNERABLE HEALTH ADVISORY**
-*Target: Seniors (60+), Individuals with Asthma, COPD, Cardiovascular Conditions & Expectant Mothers*
+*Target: Seniors (60+), Asthma/COPD Patients, Cardiac Individuals, Expectant Mothers & Outdoor Gig/Delivery Workers*
 
 ⚠️ **CURRENT EXPOSURE RISK:** ${band.category.toUpperCase()} (AQI: ${avgAqi})
-Primary Toxic Vector: Microscopic ${dominantPollutant} particulates.
+Primary Toxic Vector: Microscopic ${dominantPollutant} particulates. ${pollutantVectorNote}
 ${topHotspot ? `📍 *Critical Hotspot Identified:* ${topHotspot.ward} (AQI: ${topHotspot.aqi} - ${topHotspot.band.category})` : ''}
 
 🩺 **Immediate Protective Actions:**
 1. 🛑 **Cease Morning & Late Evening Walks:** Stagnant atmospheric inversion causes peak pollutant accumulation at dawn and dusk.
 2. 💊 **Inhaler & Medication Readiness:** Ensure minimum 14-day supply of bronchodilators, antihistamines, and cardio prescriptions. Keep rescue inhaler within arm's reach.
-3. 🏠 **Create a Clean Air Sanctuary:** Isolate one bedroom with sealed windows and continuous HEPA filtration.
-4. 😷 **Mandatory Certified N95 Protection:** Cloth masks do not filter fine ${dominantPollutant}. Wear only certified N95/FFP2 masks if transit is unavoidable.
-5. 🚨 **Red Flag Symptoms:** Immediate medical consultation required if you experience chest tightness, wheezing, palpitations, or acute shortness of breath.`;
+3. 🛵 **Gig Delivery & Field Labor Safeguards:** Delivery riders must enforce 90-minute rotation limits, use employer-provided N95 carbon respirators, and utilize designated Clean Air Recovery Havens.
+4. 🏠 **Create a Clean Air Sanctuary:** Isolate one room with sealed windows and continuous HEPA filtration.
+5. 😷 **Mandatory Certified N95 Protection:** Cloth masks do not filter fine ${dominantPollutant}. Wear only certified N95/FFP2 masks if transit is unavoidable.
+6. 🚨 **Red Flag Symptoms:** Immediate medical consultation required if you experience chest tightness, wheezing, palpitations, or acute shortness of breath.`;
   }
 
   // 3. STANDARD CITIZEN (Default)
@@ -375,8 +433,9 @@ ${topHotspot ? `📍 *Critical Hotspot Identified:* ${topHotspot.ward} (AQI: ${t
 प्रमुख प्रदूषक: **${dominantPollutant}** | स्वास्थ्य प्रभाव: ${band.healthRisk}
 ${topHotspot ? `⚠️ **सर्वाधिक प्रदूषित क्षेत्र (हॉटस्पॉट):** ${topHotspot.ward} (AQI: ${topHotspot.aqi})` : ''}
 
-✅ **नागरिकों के लिए अनुशंसित कदम:**
+✅ **नागरिकों और समुदाय के लिए अनुशंसित कदम:**
 - 🚴 **खुले में भारी व्यायाम कम करें:** पार्क में दौड़ने और साइकिल चलाने का समय कम करें।
+- 🛵 **डिलीवरी राइडर्स व गिग कामगारों के लिए:** प्रमाणित N95 मास्क पहनें और हॉटस्पॉट ट्रैफिक जंक्शनों पर अधिक देर न रुकें।
 - 🚗 **सार्वजनिक परिवहन अपनाएं:** मेट्रो, बस या कारपूल का उपयोग करें; ट्रैफिक सिग्नल पर इंजन बंद करें।
 - 🚫 **खुले में कचरा न जलाएं:** पत्तियां या कचरा जलाने की घटना देखते ही नगर निगम ऐप पर रिपोर्ट करें।
 - 🌿 **पौधों पर पानी का छिड़काव:** बालकनी और बगीचे के पौधों पर हल्का पानी छिड़कें ताकि उड़ती धूल कम हो।`;
@@ -391,6 +450,7 @@ ${topHotspot ? `⚠️ **সবচেয়ে বেশি দূষিত এ�
 
 ✅ **নাগরিকদের জন্য প্রয়োজনীয় পরামর্শ:**
 - 🚴 **বাইরে শরীরচর্চা নিয়ন্ত্রণ করুন:** ভোরবেলা বা ব্যস্ত রাস্তায় অতিরিক্ত ব্যায়াম পরিহার করুন।
+- 🛵 **ডেলিভারি কর্মীদের সুরক্ষা:** রাইডাররা কাজের সময় N95 মাস্ক ব্যবহার করুন।
 - 🚗 **গণপরিবহন ব্যবহার করুন:** ব্যক্তিগত গাড়ির পরিবর্তে বাস ও মেট্রো বেছে নিন।
 - 🚫 **বর্জ্য পোড়ানো নিষিদ্ধ:** কোথাও প্লাস্টিক বা আবর্জনা পোড়াতে দেখলে স্থানীয় পুরসভায় খবর দিন।
 - 🌿 **গাছপালায় জল দিন:** বাড়ির বারান্দা ও চারপাশের ধূলিকণা কমাতে গাছে হালকা জল ছিটিয়ে দিন।`;
@@ -405,6 +465,7 @@ ${topHotspot ? `⚠️ **அதிக மாசுபாடு உள்ள ப�
 
 ✅ **பொதுமக்கள் செய்ய வேண்டியவை:**
 - 🚴 **வெளிப்புற உடற்பயிற்சிகளைக் குறைக்கவும்:** காலை மற்றும் மாலை நேரங்களில் கடுமையான உடற்பயிற்சிகளைத் தவிர்க்கவும்.
+- 🛵 **டெலிவரி தொழிலாளர்கள் பாதுகாப்பு:** என்95 முகக்கவசம் அணிவது கட்டாயமாக்கப்பட வேண்டும்.
 - 🚗 **பொதுப் போக்குவரத்தைப் பயன்படுத்துங்கள்:** தனிப்பட்ட வாகன பயன்பாட்டைக் குறைக்கவும்.
 - 🚫 **குப்பைகளை எரிக்காதீர்கள்:** பிளாஸ்டிக் அல்லது உலர் இலைகளை திறந்த வெளியில் எரிக்க வேண்டாம்.
 - 😷 **முகக்கவசம் அணியுங்கள்:** குறிப்பாக குழந்தைகள் மற்றும் முதியவர்கள் வெளியில் செல்லும் போது மாஸ்க் அணியவும்.`;
@@ -419,6 +480,7 @@ ${topHotspot ? `⚠️ **सर्वाधिक प्रदूषित प�
 
 ✅ **नागरिकांसाठी मार्गदर्शक सूचना:**
 - 🚴 **बाहेर व्यायाम करणे मर्यादित ठेवा:** जास्त प्रदूषण असलेल्या वेळेत मैदानी धावणे टाळा.
+- 🛵 **डिलिव्हरी कर्मचाऱ्यांची काळजी:** रायडर्सनी N95 मास्क वापरणे अनिवार्य आहे.
 - 🚗 **सार्वजनिक वाहतुकीचा वापर करा:** सिग्नलवर वाहनांचे इंजिन बंद ठेवा.
 - 🚫 **कचरा जाळण्यास सक्त मनाई:** उघड्यावर कचरा किंवा पाने जाळू नका.
 - 😷 **मास्कचा वापर करा:** गर्दीच्या आणि प्रदूषित ठिकाणी जाताना N95 मास्क वापरा.`;
@@ -431,22 +493,27 @@ ${topHotspot ? `⚠️ **सर्वाधिक प्रदूषित प�
 Contaminante principal: **${dominantPollutant}** | Riesgo para la salud: ${band.healthRisk}
 ${topHotspot ? `⚠️ **Zona crítica más afectada:** ${topHotspot.ward} (ICA: ${topHotspot.aqi})` : ''}
 
-✅ **Recomendaciones para la Ciudadanía:**
+✅ **Recomendaciones para la Ciudadanía y Trabajadores:**
 - 🚴 **Moderar actividades al aire libre:** Evite ejercicios intensos durante las horas pico de tráfico.
+- 🛵 **Protección para repartidores y mensajeros:** Uso indispensable de mascarilla N95 certificada en traslados en moto o bicicleta.
 - 🚗 **Priorizar el transporte colectivo:** Reduzca los viajes en vehículos particulares y apague el motor en semáforos prolongados.
 - 🚫 **Tolerancia cero a quemas:** Prohibido quemar residuos, hojas secas o basura en espacios abiertos.
 - 😷 **Uso de mascarilla protectora:** Personas sensibles deben utilizar mascarilla N95 al transitar cerca de avenidas con alta congestión.`;
   }
 
-  // Default English Standard
+  // Default English Standard with adaptive commentary
   return `📢 **DAILY CIVIC AIR QUALITY BRIEFING & ADVISORY**
 
 📊 **Citywide Average AQI:** ${avgAqi} — **${band.category.toUpperCase()}**
 Dominant Particulate Threat: **${dominantPollutant}** | Exposure Assessment: ${band.healthRisk}
 ${topHotspot ? `⚠️ **Primary Critical Hotspot:** ${topHotspot.ward} (Station: ${topHotspot.stationId} | AQI: ${topHotspot.aqi} - ${topHotspot.band.category})` : ''}
 
-✅ **Key Recommended Citizen Interventions:**
+🔍 **Atmospheric Health Context:**
+${pollutantVectorNote} Atmospheric stagnation is elevating ground-level exposure across transit corridors.
+
+✅ **Key Recommended Citizen & Occupational Interventions:**
 - 🚴 **Calibrate Outdoor Exercise:** Reschedule strenuous aerobic workouts (running, cycling) from early morning peak inversion to mid-afternoon hours.
+- 🛵 **Gig Worker & Delivery Fleet Protection:** Platform riders must utilize certified N95 respirators, limit continuous exposure to 90 mins, and hydrate at designated dark store clean air havens.
 - 🚗 **Transit Decarbonization:** Shift commuting to mass rapid transit (Metro/Electric Bus) and observe zero-idling at signal junctions.
 - 🚫 **Report Open Combustion:** Prohibit open leaf or refuse burning. Promptly report incidents to the Municipal 24x7 Control Room.
 - 🌿 **Vegetation Wetting:** Wet private balconies and compound foliage to entrap settleable suspended dust.

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Civic Air Quality Briefing Studio Constants
- * Strict definitions for AQI thresholds, pollutant breakpoints, persona action protocols,
- * offline multi-lingual localization templates, and realistic civic test fixtures.
+ * Strict definitions for AQI thresholds, pollutant breakpoints, persona action protocols
+ * (including Gig Workers & Delivery Fleets), dynamic generative vocabularies, and test fixtures.
  * @module constants
  */
 
@@ -140,9 +140,8 @@ export const POLLUTANT_BREAKPOINTS = Object.freeze({
 });
 
 /**
- * Molecular weights and standard conversion multipliers from ppm/ppb to µg/m³
+ * Molecular weights and stoichiometric multipliers from ppm/ppb to µg/m³
  * at Standard Ambient Temperature & Pressure (25°C, 101.325 kPa).
- * µg/m³ = ppm * (molecular_weight / 24.45) * 1000
  */
 export const UNIT_CONVERSIONS = Object.freeze({
   no2: { ppmToUgM3: 1880, ppbToUgM3: 1.88, mgM3ToUgM3: 1000 },
@@ -152,7 +151,8 @@ export const UNIT_CONVERSIONS = Object.freeze({
 });
 
 /**
- * Persona-tailored civic intervention catalog mapped to AQI threshold triggers.
+ * Persona-tailored civic intervention catalog mapped to AQI threshold triggers,
+ * including dedicated Occupational Health & Safety protocols for Gig Workers & Delivery Fleets.
  */
 export const PERSONA_RULES = Object.freeze({
   ward_officer: {
@@ -199,6 +199,53 @@ export const PERSONA_RULES = Object.freeze({
         timeframe: '< 4 hrs',
         text: 'Strict audit of commercial Diesel Generator (DG) sets without emission retrofits.',
         scope: 'Commercial hubs, malls, and industrial units'
+      }
+    ]
+  },
+  gig_worker: {
+    title: 'Gig Workers, Delivery Fleets & Field Labor',
+    icon: '🛵',
+    statutoryRef: 'Occupational Safety & Health (OSH) Advisory & National Clean Air Protocol (NCAP)',
+    actions: [
+      {
+        id: 'gw_n95_distribution',
+        minAqi: 150,
+        priority: 'Immediate',
+        timeframe: '< 1 hr',
+        text: 'Mandatory free distribution of certified N95/FFP2 activated-carbon respirators at all dark stores & hubs.',
+        scope: 'Delivery riders, logistics dispatchers, outdoor field couriers'
+      },
+      {
+        id: 'gw_clean_air_refuge',
+        minAqi: 200,
+        priority: 'High',
+        timeframe: '< 2 hrs',
+        text: 'Designate HEPA-filtered "Clean Air Havens" with hydration stations at fulfillment centers for rider recovery.',
+        scope: 'Dark stores, e-commerce warehouses, sorting centers'
+      },
+      {
+        id: 'gw_hazard_allowance',
+        minAqi: 200,
+        priority: 'Medium',
+        timeframe: 'Immediate',
+        text: 'Trigger environmental hazard surge allowance and dynamic algorithmic rerouting away from acute hotspots.',
+        scope: 'App platforms (quick-commerce, ride-hailing, food delivery)'
+      },
+      {
+        id: 'gw_shift_curfew',
+        minAqi: 300,
+        priority: 'Critical',
+        timeframe: '< 1 hr',
+        text: 'Cap continuous outdoor two-wheeler rider exposure to max 90 minutes; suspend non-essential delivery during peak inversion.',
+        scope: 'Platform delivery operations (12 PM - 4 PM & 8 PM - 11 PM)'
+      },
+      {
+        id: 'gw_vulnerable_reassignment',
+        minAqi: 180,
+        priority: 'High',
+        timeframe: 'Immediate',
+        text: 'Reassign riders with pre-existing asthma, bronchitis, or cardiovascular history to indoor hub duties.',
+        scope: 'Warehouse sorting, inventory control, quality checks'
       }
     ]
   },
@@ -299,6 +346,31 @@ export const PERSONA_RULES = Object.freeze({
 });
 
 /**
+ * Dynamic vocabulary sets for combinatorial heuristic generation.
+ * Enables rich, adaptive generative variability even in offline-first mode.
+ */
+export const COMBINATORIAL_LEXICON = Object.freeze({
+  atmosphericConditions: [
+    'low boundary-layer height with ground thermal inversion',
+    'stagnant atmospheric anticyclonic stagnation trapping micro-particles',
+    'calm surface winds (< 1.5 m/s) with poor horizontal dispersion velocity',
+    'elevated nocturnal humidity fostering secondary particulate agglomeration'
+  ],
+  urgencyQualifiers: [
+    'immediate preventive mobilization required',
+    'escalated priority protocol active across all civic departments',
+    'statutory compliance mandatory under emergency environmental bylaws',
+    'cross-departmental coordination directive triggered'
+  ],
+  epidemiologicalRisk: {
+    low: 'Negligible acute cardiorespiratory stress across normal physiological thresholds.',
+    moderate: 'Subtle airway hyper-reactivity in hyper-sensitive individuals and young cohorts.',
+    high: 'Pronounced inflammation of upper airway epithelium; elevated bronchial reactivity.',
+    severe: 'Severe micro-vascular oxidative stress and alveolar particulate deposition threatening vulnerable groups.'
+  }
+});
+
+/**
  * Reading level styles for Citizen Advisory.
  */
 export const READING_LEVELS = Object.freeze({
@@ -320,7 +392,7 @@ export const READING_LEVELS = Object.freeze({
 });
 
 /**
- * Multi-language pre-configured localization dictionaries and templates.
+ * Multi-language pre-configured localization dictionaries.
  */
 export const I18N_TEMPLATES = Object.freeze({
   en: {

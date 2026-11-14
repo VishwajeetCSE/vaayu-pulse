@@ -2,12 +2,14 @@
  * @fileoverview Civic AQI Engine & Ingestion Normalizer
  * Ingests messy multi-format sensor data (CSV, TSV, Markdown tables, JSON),
  * converts mixed units, flags anomalies and data gaps with visual tags,
- * and calculates rigorous CPCB/EPA aligned AQI sub-indices and hotspot metrics.
+ * and calculates rigorous CPCB/EPA aligned AQI sub-indices and hotspot metrics
+ * backed by an LRU memoization cache.
  * @module aqi-engine
  */
 
 import { AQI_BANDS, POLLUTANT_BREAKPOINTS, UNIT_CONVERSIONS } from './constants.js';
-import { sanitizeString, sanitizeNumber, escapeHTML } from './security.js';
+import { sanitizeString, sanitizeNumber } from './security.js';
+import { aqiCalcCache } from './cache.js';
 
 /**
  * Standard column aliases for heuristic header mapping.
@@ -199,21 +201,29 @@ function mapCanonicalFields(rawRow) {
 }
 
 /**
- * Extracts numeric value and unit from messy field like "185.0 ug/m3" or "0.065 ppm".
+ * Extracts numeric value and unit from messy field with LRU caching.
  *
  * @param {*} value - The input value.
  * @param {string} pollutant - The pollutant key (pm25, pm10, no2, so2, co, o3).
  * @param {string} [defaultUnit='ug/m3'] - Default unit if not specified.
- * @returns {{ val: number|null, wasConverted: boolean, rawUnit: string }} Normalized value in standard µg/m³ (or mg/m³ for CO).
+ * @returns {{ val: number|null, wasConverted: boolean, rawUnit: string }}
  */
 export function normalizeConcentration(value, pollutant, defaultUnit = 'ug/m3') {
   if (value === null || value === undefined || value === '') {
     return { val: null, wasConverted: false, rawUnit: '' };
   }
 
+  const cacheKey = `norm_${pollutant}_${String(value).trim()}_${defaultUnit}`;
+  const cached = aqiCalcCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const strVal = String(value).trim().toLowerCase();
   if (strVal === 'na' || strVal === 'n/a' || strVal === 'null' || strVal === '-' || strVal === 'nan') {
-    return { val: null, wasConverted: false, rawUnit: '' };
+    const res = { val: null, wasConverted: false, rawUnit: '' };
+    aqiCalcCache.set(cacheKey, res);
+    return res;
   }
 
   // Extract number and unit
@@ -234,19 +244,19 @@ export function normalizeConcentration(value, pollutant, defaultUnit = 'ug/m3') 
   }
 
   if (num === null || Number.isNaN(num)) {
-    return { val: null, wasConverted: false, rawUnit: '' };
+    const res = { val: null, wasConverted: false, rawUnit: '' };
+    aqiCalcCache.set(cacheKey, res);
+    return res;
   }
 
   let wasConverted = false;
   let normalizedVal = num;
 
-  // Convert unit to canonical standard: µg/m³ for PM2.5, PM10, NO2, SO2, O3; mg/m³ for CO
   const isPpm = unit.includes('ppm');
   const isPpb = unit.includes('ppb');
   const isMg = unit.includes('mg');
 
   if (pollutant === 'co') {
-    // CO is measured in mg/m³
     if (isPpm) {
       normalizedVal = num * UNIT_CONVERSIONS.co.ppmToMgM3;
       wasConverted = true;
@@ -255,7 +265,6 @@ export function normalizeConcentration(value, pollutant, defaultUnit = 'ug/m3') 
       wasConverted = true;
     }
   } else {
-    // Other pollutants are in µg/m³
     if (isPpm) {
       const conv = UNIT_CONVERSIONS[pollutant]?.ppmToUgM3;
       if (conv) {
@@ -274,15 +283,18 @@ export function normalizeConcentration(value, pollutant, defaultUnit = 'ug/m3') 
     }
   }
 
-  return {
+  const finalResult = {
     val: Math.round(normalizedVal * 100) / 100,
     wasConverted,
     rawUnit: unit
   };
+
+  aqiCalcCache.set(cacheKey, finalResult);
+  return finalResult;
 }
 
 /**
- * Calculates AQI sub-index for a specific pollutant concentration.
+ * Calculates AQI sub-index for a specific pollutant concentration with LRU memoization.
  *
  * @param {string} pollutant - Pollutant key ('pm25', 'pm10', 'no2', 'so2', 'co', 'o3').
  * @param {number|null} concentration - Normalized concentration.
@@ -293,25 +305,36 @@ export function calculateSubIndex(pollutant, concentration) {
     return null;
   }
 
+  const cacheKey = `subidx_${pollutant}_${concentration}`;
+  const cached = aqiCalcCache.get(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
+
   const breakpoints = POLLUTANT_BREAKPOINTS[pollutant];
   if (!breakpoints) {
     return null;
   }
 
-  // Clamp upper boundary for extreme severe readings
+  // Upper boundary clamp
   const highest = breakpoints[breakpoints.length - 1];
   if (concentration >= highest.bpHi) {
+    aqiCalcCache.set(cacheKey, 500);
     return 500;
   }
 
   for (const bp of breakpoints) {
     if (concentration >= bp.bpLo && concentration <= bp.bpHi) {
       const subAqi = ((bp.aqiHi - bp.aqiLo) / (bp.bpHi - bp.bpLo)) * (concentration - bp.bpLo) + bp.aqiLo;
-      return Math.round(subAqi);
+      const res = Math.round(subAqi);
+      aqiCalcCache.set(cacheKey, res);
+      return res;
     }
   }
 
-  return Math.round(highest.aqiHi);
+  const fallbackVal = Math.round(highest.aqiHi);
+  aqiCalcCache.set(cacheKey, fallbackVal);
+  return fallbackVal;
 }
 
 /**
@@ -349,7 +372,6 @@ export function normalizeTimestamp(rawTime) {
   const parsedDate = new Date(str);
 
   if (!Number.isNaN(parsedDate.getTime())) {
-    // Valid standard date
     const iso = parsedDate.toISOString().replace('T', ' ').slice(0, 19);
     return { formattedTime: iso, isStaleOrInvalid: false };
   }
@@ -368,7 +390,6 @@ export function normalizeTimestamp(rawTime) {
     };
   }
 
-  // Fallback with flag
   return {
     formattedTime: sanitizeString(str, 30),
     isStaleOrInvalid: true
@@ -430,7 +451,6 @@ export function normalizeAndProcessData(rawRows) {
       }
 
       if (norm.val === null) {
-        // Missing reading
         if (p === 'pm25' || p === 'pm10') {
           anomalies.push({
             type: ANOMALY_TYPES.DATA_GAP.code,
@@ -440,7 +460,6 @@ export function normalizeAndProcessData(rawRows) {
         concentrations[p] = null;
         subIndices[p] = null;
       } else {
-        // Check physical bounds
         let isOutOfBounds = false;
         if (norm.val < 0) {
           isOutOfBounds = true;
@@ -477,7 +496,6 @@ export function normalizeAndProcessData(rawRows) {
       });
     }
 
-    // Determine station AQI: maximum valid sub-index
     const validSubIndices = Object.entries(subIndices).filter(([_, val]) => typeof val === 'number');
 
     let aqi = 0;
@@ -495,7 +513,6 @@ export function normalizeAndProcessData(rawRows) {
       aqi = 0;
     }
 
-    // Unreliability threshold
     const isUnreliable = anomalies.some(
       (a) => a.type === ANOMALY_TYPES.SENSOR_UNRELIABLE.code || a.type === ANOMALY_TYPES.OUT_OF_BOUNDS.code
     ) || anomalies.length >= 2;
@@ -529,7 +546,6 @@ export function normalizeAndProcessData(rawRows) {
     });
   });
 
-  // Sort stations descending by AQI to highlight hotspots first
   stations.sort((a, b) => b.aqi - a.aqi);
 
   const validAqiList = stations.filter((s) => s.aqi > 0).map((s) => s.aqi);
@@ -568,7 +584,6 @@ export function identifyHotspots(stations, topN = 3) {
     return [];
   }
 
-  // Filter stations with AQI > 100 and sort by AQI descending
   const candidates = [...stations].sort((a, b) => b.aqi - a.aqi);
   const hotspots = candidates.slice(0, topN).map((st, index) => {
     let priority = 'Moderate';

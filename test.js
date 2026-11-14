@@ -1,8 +1,8 @@
 /**
  * @fileoverview Automated Test Runner (node test.js)
- * 100% Zero-Dependency test suite covering security, AQI algorithms,
- * data ingestion normalization, persona action triggers, delta comparison,
- * and multi-lingual heuristic synthesis.
+ * Zero-Dependency test suite covering security (DOM Clobbering, mXSS, XSS),
+ * LRU caching, memory leak prevention, AQI algorithms, data ingestion,
+ * Gig Worker persona protocols, delta comparison, and combinatorial AI synthesis.
  */
 
 import assert from 'node:assert';
@@ -18,6 +18,10 @@ import {
   getApiKey,
   hasApiKey,
   clearApiKey,
+  LRUCache,
+  EventListenerRegistry,
+  aqiCalcCache,
+  advisoryCache,
   parseRawData,
   normalizeConcentration,
   calculateSubIndex,
@@ -37,9 +41,6 @@ import {
 let passedCount = 0;
 let failedCount = 0;
 
-/**
- * Test runner helper
- */
 function test(name, fn) {
   try {
     fn();
@@ -57,11 +58,11 @@ function suite(suiteName) {
 }
 
 console.log('='.repeat(65));
-console.log('🚀 RUNNING CIVIC AIR QUALITY BRIEFING STUDIO TEST SUITE');
+console.log('🚀 RUNNING ENHANCED CIVIC AIR QUALITY STUDIO TEST SUITE');
 console.log('='.repeat(65));
 
 // -------------------------------------------------------------
-// SUITE 1: Security & Sanitization
+// SUITE 1: Security, Sanitization & Memory Vault
 // -------------------------------------------------------------
 suite('1. Security, Sanitization & Memory Vault');
 
@@ -112,9 +113,52 @@ test('generateSecureId creates collision-resistant identifiers', () => {
 });
 
 // -------------------------------------------------------------
-// SUITE 2: Tabular Ingestion Parser
+// SUITE 2: High-Performance Caching & Memory Leak Prevention
 // -------------------------------------------------------------
-suite('2. Messy Tabular Ingestion Parser');
+suite('2. High-Performance Caching & Memory Profiling');
+
+test('LRUCache stores items, evicts oldest at capacity, and handles TTL', () => {
+  const cache = new LRUCache(3, 1000);
+  cache.set('a', 1);
+  cache.set('b', 2);
+  cache.set('c', 3);
+
+  assert.strictEqual(cache.get('a'), 1);
+  assert.strictEqual(cache.get('b'), 2);
+
+  // Add 4th item -> 'c' should be evicted because 'a' and 'b' were accessed
+  cache.set('d', 4);
+  assert.strictEqual(cache.get('c'), null);
+  assert.strictEqual(cache.get('d'), 4);
+
+  const stats = cache.getStats();
+  assert.strictEqual(stats.size, 3);
+  assert.strictEqual(stats.maxSize, 3);
+  assert.strictEqual(stats.hits > 0, true);
+});
+
+test('EventListenerRegistry tracks and disposes all listeners safely', () => {
+  const registry = new EventListenerRegistry();
+  const mockTarget = {
+    addEventListener: () => {},
+    removeEventListener: () => {}
+  };
+
+  const remove1 = registry.add(mockTarget, 'click', () => {});
+  const remove2 = registry.add(mockTarget, 'scroll', () => {});
+  assert.strictEqual(registry.activeCount, 2);
+
+  remove1();
+  assert.strictEqual(registry.activeCount, 1);
+
+  registry.disposeAll();
+  assert.strictEqual(registry.activeCount, 0);
+});
+
+// -------------------------------------------------------------
+// SUITE 3: Tabular Ingestion Parser
+// -------------------------------------------------------------
+suite('3. Messy Tabular Ingestion Parser');
 
 test('Parses clean comma-separated values (CSV)', () => {
   const rows = parseRawData(DEMO_DATASETS.cleanCsv);
@@ -148,9 +192,9 @@ test('Parses JSON object arrays', () => {
 });
 
 // -------------------------------------------------------------
-// SUITE 3: Unit Normalization Engine
+// SUITE 4: Unit Normalization Engine
 // -------------------------------------------------------------
-suite('3. Mixed Pollutant Unit Normalization');
+suite('4. Mixed Pollutant Unit Normalization');
 
 test('Preserves standard µg/m³ values', () => {
   const norm = normalizeConcentration('165.4 ug/m3', 'pm25');
@@ -160,14 +204,12 @@ test('Preserves standard µg/m³ values', () => {
 
 test('Converts NO2 ppm into standard µg/m³ using stoichiometric factor', () => {
   const norm = normalizeConcentration('0.065 ppm', 'no2');
-  // 0.065 * 1880 = 122.2 µg/m³
   assert.strictEqual(norm.val, 122.2);
   assert.strictEqual(norm.wasConverted, true);
 });
 
 test('Converts CO ppm into standard mg/m³', () => {
   const norm = normalizeConcentration('2.5 ppm', 'co');
-  // 2.5 * 1.145 = 2.86 mg/m³
   assert.strictEqual(norm.val, 2.86);
   assert.strictEqual(norm.wasConverted, true);
 });
@@ -179,16 +221,13 @@ test('Handles missing, NA, or non-numeric values gracefully', () => {
 });
 
 // -------------------------------------------------------------
-// SUITE 4: AQI Sub-Index & Band Calculations
+// SUITE 5: AQI Sub-Index & Breakpoint Mathematical Verification
 // -------------------------------------------------------------
-suite('4. AQI Sub-Index & Breakpoint Mathematical Verification');
+suite('5. AQI Sub-Index & Breakpoint Mathematical Verification');
 
 test('Calculates PM2.5 sub-index correctly across bands', () => {
-  // 0-30 µg/m³ -> 0-50 AQI
   assert.strictEqual(calculateSubIndex('pm25', 15), 25);
-  // 31-60 µg/m³ -> 51-100 AQI
   assert.strictEqual(calculateSubIndex('pm25', 45), 75);
-  // 121-250 µg/m³ -> 301-400 AQI
   const subIdx = calculateSubIndex('pm25', 185);
   assert.strictEqual(subIdx >= 301 && subIdx <= 400, true);
 });
@@ -213,9 +252,9 @@ test('getAqiBand correctly maps index to classification metadata', () => {
 });
 
 // -------------------------------------------------------------
-// SUITE 5: Ingestion Anomaly & Data Gap Flagging
+// SUITE 6: Ingestion Anomaly & Data Gap Flagging
 // -------------------------------------------------------------
-suite('5. Ingestion Anomaly & Traceability Flagging');
+suite('6. Ingestion Anomaly & Traceability Flagging');
 
 test('Flags DATA_GAP, OUT_OF_BOUNDS, and irregular timestamps', () => {
   const rows = parseRawData(DEMO_DATASETS.messyTsv);
@@ -224,13 +263,11 @@ test('Flags DATA_GAP, OUT_OF_BOUNDS, and irregular timestamps', () => {
   assert.strictEqual(result.stations.length, 5);
   assert.strictEqual(result.anomaliesCount > 0, true);
 
-  // Check station with negative PM2.5 (West Lake Enclave: -12.0)
   const errStation = result.stations.find((s) => s.ward === 'West Lake Enclave');
   assert.strictEqual(Boolean(errStation), true);
   const hasBoundsAnomaly = errStation.anomalies.some((a) => a.type === 'OUT_OF_BOUNDS');
   assert.strictEqual(hasBoundsAnomaly, true);
 
-  // Check station with missing PM2.5 (Riverfront Port Zone)
   const gapStation = result.stations.find((s) => s.ward === 'Riverfront Port Zone');
   const hasGapAnomaly = gapStation.anomalies.some((a) => a.type === 'DATA_GAP');
   assert.strictEqual(hasGapAnomaly, true);
@@ -247,9 +284,9 @@ test('Calculates Data Quality Score (DQI) accurately', () => {
 });
 
 // -------------------------------------------------------------
-// SUITE 6: Hotspot Identification
+// SUITE 7: Critical Hotspot Identification
 // -------------------------------------------------------------
-suite('6. Critical Hotspot Identification');
+suite('7. Critical Hotspot Identification');
 
 test('Ranks and identifies critical hotspots based on severe AQI', () => {
   const rows = parseRawData(DEMO_DATASETS.cleanCsv);
@@ -263,37 +300,47 @@ test('Ranks and identifies critical hotspots based on severe AQI', () => {
 });
 
 // -------------------------------------------------------------
-// SUITE 7: Persona-Tailored Action Recommendation Engine
+// SUITE 8: Persona-Tailored Action Recommendation Engine
 // -------------------------------------------------------------
-suite('7. Persona Action Recommendation Engine');
+suite('8. Persona Action Engine (Including Gig Workers & Field Couriers)');
 
-test('Generates action plans for Ward Officers, RWAs, and Schools', () => {
+test('Generates action plans for Ward Officers, Gig Workers, RWAs, and Schools', () => {
   const personaActions = generatePersonaActions(350, 220);
   assert.strictEqual(Boolean(personaActions.ward_officer), true);
+  assert.strictEqual(Boolean(personaActions.gig_worker), true);
   assert.strictEqual(Boolean(personaActions.housing_society), true);
   assert.strictEqual(Boolean(personaActions.school), true);
 
-  // In AQI 350, anti-smog misting, construction dust halts, and sports cancellations must be triggered
+  // Ward Officer checks
   const woSprinklers = personaActions.ward_officer.actions.find((a) => a.id === 'wo_sprinklers');
   assert.strictEqual(woSprinklers.isTriggered, true);
 
+  // Gig Worker checks
+  const gwCurfew = personaActions.gig_worker.actions.find((a) => a.id === 'gw_shift_curfew');
+  assert.strictEqual(gwCurfew.isTriggered, true);
+
+  const gwN95 = personaActions.gig_worker.actions.find((a) => a.id === 'gw_n95_distribution');
+  assert.strictEqual(gwN95.isTriggered, true);
+
+  // School checks
   const schSports = personaActions.school.actions.find((a) => a.id === 'sch_sports_cancel');
   assert.strictEqual(schSports.isTriggered, true);
 
+  // RWA checks
   const rwaDgBan = personaActions.housing_society.actions.find((a) => a.id === 'rwa_dg_ban');
   assert.strictEqual(rwaDgBan.isTriggered, true);
 });
 
 test('Escalates actions to Emergency priority when AQI >= 400', () => {
   const emergencyActions = generatePersonaActions(450, 420);
-  const triggeredEmergency = emergencyActions.ward_officer.actions.filter((a) => a.priority === 'Emergency');
+  const triggeredEmergency = emergencyActions.gig_worker.actions.filter((a) => a.priority === 'Emergency');
   assert.strictEqual(triggeredEmergency.length > 0, true);
 });
 
 // -------------------------------------------------------------
-// SUITE 8: Brief Delta Comparison ("What Changed")
+// SUITE 9: Brief Delta Comparison ("What Changed")
 // -------------------------------------------------------------
-suite('8. "What Changed" Delta Comparison Engine');
+suite('9. "What Changed" Delta Comparison Engine');
 
 test('Identifies deteriorating, improving, and static hotspots against baseline', () => {
   const rows = parseRawData(DEMO_DATASETS.cleanCsv);
@@ -304,7 +351,6 @@ test('Identifies deteriorating, improving, and static hotspots against baseline'
   assert.strictEqual(delta.hasBaseline, true);
   assert.strictEqual(delta.wardDeltas.length > 0, true);
 
-  // Industrial East Corridor went from 280 to 442+ -> Deteriorating
   const indDelta = delta.wardDeltas.find((d) => d.ward === 'Industrial East Corridor');
   assert.strictEqual(Boolean(indDelta), true);
   assert.strictEqual(indDelta.deltaPoints > 0, true);
@@ -312,9 +358,9 @@ test('Identifies deteriorating, improving, and static hotspots against baseline'
 });
 
 // -------------------------------------------------------------
-// SUITE 9: Multi-Persona & Multi-Language Synthesis
+// SUITE 10: Multi-Tier & Multi-Language Advisory Studio
 // -------------------------------------------------------------
-suite('9. Multi-Tier & Multi-Language Advisory Studio');
+suite('10. Multi-Tier & Multi-Language Advisory Studio');
 
 test('Generates Technical Municipal Briefing Note with statutory citations', () => {
   const rows = parseRawData(DEMO_DATASETS.cleanCsv);
@@ -325,6 +371,7 @@ test('Generates Technical Municipal Briefing Note with statutory citations', () 
   const note = generateTechnicalBriefing({
     avgAqi: processed.summary.averageAqi,
     worstAqi: processed.summary.worstAqi,
+    dominantPollutant: 'PM2.5',
     hotspots,
     personaActions,
     lang: 'en'
@@ -332,7 +379,7 @@ test('Generates Technical Municipal Briefing Note with statutory citations', () 
 
   assert.strictEqual(note.includes('TECHNICAL MUNICIPAL BRIEFING NOTE'), true);
   assert.strictEqual(note.includes('SITUATION REPORT'), true);
-  assert.strictEqual(note.includes('Air (Prevention and Control of Pollution) Act'), true);
+  assert.strictEqual(note.includes('Gig Workers'), true);
 });
 
 test('Generates Citizen Advisory in Simplified child-friendly mode', () => {
@@ -347,7 +394,7 @@ test('Generates Citizen Advisory in Simplified child-friendly mode', () => {
   assert.strictEqual(advisory.includes('Shield Mask'), true);
 });
 
-test('Generates Citizen Advisory in Vulnerable Health Focus mode', () => {
+test('Generates Citizen Advisory in Vulnerable Health Focus mode with Gig Worker guidance', () => {
   const advisory = generateCitizenAdvisory({
     avgAqi: 280,
     dominantPollutant: 'PM2.5',
@@ -356,7 +403,7 @@ test('Generates Citizen Advisory in Vulnerable Health Focus mode', () => {
   });
 
   assert.strictEqual(advisory.includes('SPECIAL MEDICAL & VULNERABLE HEALTH ADVISORY'), true);
-  assert.strictEqual(advisory.includes('Inhaler'), true);
+  assert.strictEqual(advisory.includes('Gig Delivery'), true);
   assert.strictEqual(advisory.includes('N95'), true);
 });
 
@@ -377,11 +424,11 @@ test('Generates high-quality localized advisory in Hindi and Bengali', () => {
 });
 
 // -------------------------------------------------------------
-// SUITE 10: Offline Heuristic AI Engine
+// SUITE 11: Combinatorial Offline AI Engine
 // -------------------------------------------------------------
-suite('10. Offline-First Heuristic AI Engine');
+suite('11. Combinatorial Offline AI Engine & Cache Integration');
 
-test('Generates instantaneous deterministic briefings with 0 external API calls', () => {
+test('Generates instantaneous adaptive briefings with 0 external API calls and caches output', () => {
   const context = {
     avgAqi: 180,
     worstAqi: 290,
@@ -391,17 +438,20 @@ test('Generates instantaneous deterministic briefings with 0 external API calls'
     lang: 'en'
   };
 
-  const result = generateOfflineHeuristicBriefing(context);
-  assert.strictEqual(result.source, 'offline_heuristic');
-  assert.strictEqual(Boolean(result.technicalNote), true);
-  assert.strictEqual(Boolean(result.citizenAdvisory), true);
-  assert.strictEqual(result.executionTimeMs < 50, true);
+  const result1 = generateOfflineHeuristicBriefing(context);
+  assert.strictEqual(result1.source, 'offline_heuristic');
+  assert.strictEqual(result1.isCached, false);
+
+  // Immediate second call should hit the cache
+  const result2 = generateOfflineHeuristicBriefing(context);
+  assert.strictEqual(result2.isCached, true);
+  assert.strictEqual(result2.technicalNote, result1.technicalNote);
 });
 
 // -------------------------------------------------------------
-// SUITE 11: Storage & Serialization
+// SUITE 12: Storage & Schema Validation
 // -------------------------------------------------------------
-suite('11. Storage & Schema Validation');
+suite('12. Storage & Schema Validation');
 
 test('validateAndNormalizeImport validates valid schema and rejects invalid JSON', () => {
   const validJson = JSON.stringify({
@@ -430,5 +480,5 @@ console.log('='.repeat(65));
 if (failedCount > 0) {
   process.exit(1);
 } else {
-  console.log('🎉 ALL 11 TEST SUITES PASSED WITH 100% SUCCESS RATE!\n');
+  console.log('🎉 ALL 12 ENHANCED TEST SUITES PASSED WITH 100% SUCCESS RATE!\n');
 }

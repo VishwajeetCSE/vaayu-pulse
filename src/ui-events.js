@@ -1,9 +1,11 @@
 /**
  * @fileoverview UI Event Handlers & DOM Cache Module
  * Provides centralized, debounced, accessible DOM element bindings
- * and event delegation with robust null-safety.
+ * and event delegation with robust null-safety and memory leak prevention.
  * @module ui-events
  */
+
+import { appEventRegistry } from './cache.js';
 
 /**
  * Creates a debounced version of a callback function.
@@ -70,7 +72,8 @@ export function getDOMElements() {
 }
 
 /**
- * Attaches file drop-zone listeners for drag-and-drop ingestion.
+ * Attaches file drop-zone listeners for drag-and-drop ingestion
+ * registered via appEventRegistry for leak-free teardowns.
  *
  * @param {HTMLElement} dropZone - Drop area element.
  * @param {Function} onFileRead - Callback receiving file contents string.
@@ -101,9 +104,9 @@ export function setupDropZone(dropZone, onFileRead) {
     }
   };
 
-  dropZone.addEventListener('dragover', handleDragOver);
-  dropZone.addEventListener('dragleave', handleDragLeave);
-  dropZone.addEventListener('drop', handleDrop);
+  appEventRegistry.add(dropZone, 'dragover', handleDragOver);
+  appEventRegistry.add(dropZone, 'dragleave', handleDragLeave);
+  appEventRegistry.add(dropZone, 'drop', handleDrop);
 }
 
 /**
@@ -147,7 +150,6 @@ export async function copyToClipboard(text, button = null) {
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
       await navigator.clipboard.writeText(text);
     } else {
-      // Fallback
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';

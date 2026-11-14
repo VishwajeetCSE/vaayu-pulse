@@ -1,7 +1,7 @@
 /**
  * @fileoverview Pure DOM Presentation Renderers
- * Highly performant, zero layout thrashing presentation layer with
- * zero XSS vulnerabilities, safe DOM injection, and accessible semantic structures.
+ * Highly performant presentation layer with zero layout thrashing,
+ * airtight DOM Clobbering / mXSS sanitization, and accessible semantic structures.
  * @module ui-renderers
  */
 
@@ -9,9 +9,10 @@ import { escapeHTML, setSanitizedHTML } from './security.js';
 import { ANOMALY_TYPES } from './aqi-engine.js';
 import { DELTA_STATUS } from './advisory-engine.js';
 import { READING_LEVELS, I18N_TEMPLATES } from './constants.js';
+import { aqiCalcCache, advisoryCache } from './cache.js';
 
 /**
- * Renders Executive KPI Overview Cards.
+ * Renders Executive KPI Overview Cards with cache telemetry.
  *
  * @param {HTMLElement} container - Target container.
  * @param {Object} summary - Summary statistics from AQI engine.
@@ -30,6 +31,8 @@ export function renderKpiCards(container, summary, aiMeta) {
   const engineBadgeClass = aiMeta?.source === 'live_gemini'
     ? 'badge-gemini'
     : 'badge-blue';
+
+  const cacheStats = aqiCalcCache.getStats();
 
   const html = `
     <div class="kpi-card" role="region" aria-label="Citywide Average Air Quality">
@@ -58,9 +61,9 @@ export function renderKpiCards(container, summary, aiMeta) {
       <div class="kpi-caption">Lowest reading: <strong>${summary.bestAqi}</strong> across monitored sectors.</div>
     </div>
 
-    <div class="kpi-card" role="region" aria-label="Sensor Data Quality Index">
+    <div class="kpi-card" role="region" aria-label="Sensor Data Quality Index & Memory Caching">
       <div class="kpi-header">
-        <span class="kpi-title">Sensor Health & DQI</span>
+        <span class="kpi-title">Sensor Health &amp; Cache</span>
         <span class="kpi-icon" aria-hidden="true">📡</span>
       </div>
       <div class="kpi-value-row">
@@ -69,7 +72,7 @@ export function renderKpiCards(container, summary, aiMeta) {
           ${summary.reliableStationsCount}/${summary.totalStations} Verified
         </span>
       </div>
-      <div class="kpi-caption">Traceability confidence index based on gap & bounds audits.</div>
+      <div class="kpi-caption">LRU Cache: <strong>${cacheStats.hitRatio}</strong> hits (${cacheStats.hits} memoized calls)</div>
     </div>
 
     <div class="kpi-card" role="region" aria-label="GenAI Engine Status">
@@ -82,7 +85,7 @@ export function renderKpiCards(container, summary, aiMeta) {
           ${escapeHTML(engineName)}
         </span>
       </div>
-      <div class="kpi-caption">${escapeHTML(aiMeta?.model || 'Deterministic Civic Engine')} (${aiMeta?.executionTimeMs ?? 0}ms)</div>
+      <div class="kpi-caption">${escapeHTML(aiMeta?.model || 'Deterministic Civic Engine')} (${aiMeta?.executionTimeMs ?? 0}ms${aiMeta?.isCached ? ' - Cached' : ''})</div>
     </div>
   `;
 
@@ -112,7 +115,6 @@ export function renderDataTable(container, stations) {
   stations.forEach((st) => {
     const band = st.band;
 
-    // Render anomaly badges
     let badgesHtml = '';
     if (st.anomalies && st.anomalies.length > 0) {
       badgesHtml = st.anomalies
@@ -267,7 +269,8 @@ export function renderDeltaView(container, deltaAnalysis) {
 }
 
 /**
- * Renders Persona-Tailored Action Recommendation Checklists.
+ * Renders Persona-Tailored Action Recommendation Checklists,
+ * now supporting Ward Officers, Gig Workers, RWAs, and Schools.
  *
  * @param {HTMLElement} container - Target container.
  * @param {Object} personaActions - Actions generated for roles.
@@ -405,7 +408,6 @@ export function renderAdvisoryStudio(container, briefingResult, viewMode = 'citi
 export function renderSnapshotOptions(selectEl, snapshots, selectedId = null) {
   if (!selectEl || !Array.isArray(snapshots)) return;
 
-  // Clear existing options
   selectEl.innerHTML = '';
 
   const defaultOption = document.createElement('option');

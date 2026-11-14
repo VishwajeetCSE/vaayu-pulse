@@ -1,11 +1,12 @@
 /**
  * @fileoverview Civic Air Quality Briefing Studio - Public Barrel Export
- * Exposes core engines, security routines, renderers, and accessibility primitives.
+ * Exposes core engines, security routines, renderers, caching, and accessibility primitives.
  * @module index
  */
 
 export * from './constants.js';
 export * from './security.js';
+export * from './cache.js';
 export * from './aqi-engine.js';
 export * from './advisory-engine.js';
 export * from './ai.js';
