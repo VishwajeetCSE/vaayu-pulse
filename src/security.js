@@ -32,7 +32,8 @@ const CLOBBERING_PROPERTIES = new Set([
 const ALLOWED_TAGS = new Set([
   'DIV', 'SPAN', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI',
   'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD', 'STRONG', 'EM', 'B', 'I',
-  'SMALL', 'PRE', 'CODE', 'LABEL', 'INPUT', 'BUTTON', 'A', 'HR', 'BR'
+  'SMALL', 'PRE', 'CODE', 'LABEL', 'INPUT', 'BUTTON', 'A', 'HR', 'BR',
+  'SELECT', 'OPTION', 'OPTGROUP', 'CANVAS', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'NAV', 'MAIN'
 ]);
 
 /**
@@ -40,7 +41,7 @@ const ALLOWED_TAGS = new Set([
  */
 const ALLOWED_ATTRIBUTES = new Set([
   'class', 'style', 'role', 'title', 'tabindex', 'type', 'checked',
-  'disabled', 'rows', 'placeholder', 'target', 'rel', 'id'
+  'disabled', 'rows', 'placeholder', 'target', 'rel', 'id', 'value', 'selected'
 ]);
 
 /**
@@ -164,8 +165,8 @@ export function setSanitizedHTML(element, rawHTML) {
       if (node.nodeType === 1) {
         const tagName = node.nodeName.toUpperCase();
 
-        // Enforce strict element whitelist; completely remove forbidden/foreign elements
-        if (!ALLOWED_TAGS.has(tagName)) {
+        // Enforce strict element whitelist; never remove doc.body itself
+        if (node !== doc.body && tagName !== 'BODY' && tagName !== 'HTML' && !ALLOWED_TAGS.has(tagName)) {
           node.remove();
           return;
         }
@@ -246,11 +247,17 @@ export function setSanitizedHTML(element, rawHTML) {
       }
     };
 
-    scrubNode(doc.body);
+    if (doc.body) {
+      // Scrub all root children
+      const rootChildren = Array.from(doc.body.childNodes);
+      for (const child of rootChildren) {
+        scrubNode(child);
+      }
 
-    // Append safe sanitized nodes into target element
-    while (doc.body.firstChild) {
-      element.appendChild(doc.body.firstChild);
+      // Append safe sanitized nodes into target element
+      while (doc.body.firstChild) {
+        element.appendChild(doc.body.firstChild);
+      }
     }
   } else {
     // Non-DOM headless fallback: set safe escaped text
