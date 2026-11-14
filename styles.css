@@ -369,6 +369,77 @@ body {
 .dot-blue    { background: var(--google-blue); }
 .dot-purple  { background: var(--google-purple); }
 .dot-green   { background: #10b981; }
+.dot-lime    { background: #84cc16; }
+.dot-orange  { background: #f97316; }
+.dot-red     { background: #ef4444; }
+.dot-maroon  { background: #7f1d1d; }
+
+/* City Selector styling in Quick Bar */
+.city-select-wrapper {
+  display: inline-flex;
+  align-items: center;
+}
+
+.city-select {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  box-shadow: var(--shadow-xs);
+  transition: all 0.15s ease;
+}
+
+.city-select:hover, .city-select:focus {
+  border-color: var(--google-blue);
+  box-shadow: 0 0 0 2px var(--blue-bg);
+}
+
+/* Real-Time Chart Section & Canvas */
+.chart-section {
+  margin-bottom: 24px;
+}
+
+.chart-card-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.aqi-chart-canvas {
+  width: 100%;
+  max-width: 100%;
+  height: 280px;
+  display: block;
+}
+
+.chart-legend-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
 
 .skyline-card {
   background: var(--bg-surface);

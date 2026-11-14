@@ -68,7 +68,8 @@ export function getDOMElements() {
 
     // General
     themeToggleBtn: document.getElementById('theme-toggle-btn'),
-    citySelect: document.getElementById('city-select')
+    citySelect: document.getElementById('city-select'),
+    aqiChart: document.getElementById('aqi-chart')
   };
 }
 

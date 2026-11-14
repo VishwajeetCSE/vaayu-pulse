@@ -32,13 +32,16 @@ import {
   trapFocus,
   releaseFocus,
   renderKpiCards,
+  renderChart,
   renderDataTable,
   renderDeltaView,
   renderPersonaPanels,
   renderAdvisoryStudio,
-  renderSnapshotOptions
+  renderSnapshotOptions,
+  populateCitySelect,
+  getSelectedCity,
+  getCityDataset
 } from './src/index.js';
-import { populateCitySelect, getSelectedCity } from './src/cities.js';
 
 /**
  * Application State Container
@@ -109,12 +112,8 @@ async function processCurrentData() {
   announceToScreenReader('Processing air quality data and calculating civic advisories...');
 
   // 1. Ingestion & Normalization
-  // Parse raw data
   const rawRows = parseRawData(state.rawText);
-  // Apply city filter if a city is selected
-  const selectedCity = dom.citySelect ? getSelectedCity(dom.citySelect) : null;
-  const filteredRows = selectedCity ? rawRows.filter(row => row.city === selectedCity.city) : rawRows;
-  state.processedData = normalizeAndProcessData(filteredRows);
+  state.processedData = normalizeAndProcessData(rawRows);
   state.hotspots = identifyHotspots(state.processedData.stations, 3);
 
   // 2. Persona Action Catalog
@@ -171,6 +170,9 @@ function renderAllViews() {
   if (!state.processedData) return;
 
   renderKpiCards(dom.kpiContainer, state.processedData.summary, state.aiMeta);
+  if (dom.aqiChart) {
+    renderChart(dom.aqiChart, state.processedData.stations);
+  }
   renderDataTable(dom.dataTableContainer, state.processedData.stations);
   renderDeltaView(dom.deltaContainer, state.deltaAnalysis);
   renderPersonaPanels(dom.personaContainer, state.personaActions, state.activePersonaRole);
@@ -200,151 +202,10 @@ function updateApiKeyBadge() {
  */
 function initializeApp() {
   const dom = getDOMElements();
-  // Populate city selector
-  populateCitySelect(dom.citySelect);
-  // Listen for city selection
-  if (dom.citySelect) {
-    dom.citySelect.addEventListener('change', () => {
-      const city = getSelectedCity(dom.citySelect);
-      if (city) {
-        showToast(`Selected ${city.city} (Pincode ${city.pincode})`, '📍');
-        // Filter data if needed – will be applied during processing
-      }
-    });
-  }
-  // Load preferences (theme)
-  const prefs = loadPreferences();
-  if (prefs && prefs.theme === 'dark') {
-    document.documentElement.classList.add('dark-theme');
-    document.body.classList.add('dark-theme');
-    if (dom.themeToggleBtn) {
-      dom.themeToggleBtn.setAttribute('aria-pressed', 'true');
-    }
-  }
-  // Theme toggle button handler
-  if (dom.themeToggleBtn) {
-    dom.themeToggleBtn.addEventListener('click', () => {
-      const isDark = document.documentElement.classList.toggle('dark-theme');
-      document.body.classList.toggle('dark-theme');
-      const newTheme = isDark ? 'dark' : 'light';
-      const newPrefs = { ...(prefs || {}), theme: newTheme };
-      savePreferences(newPrefs);
-      dom.themeToggleBtn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-    });
-  }
-  // Load snapshots
-  state.snapshots = loadSnapshots();
-  if (state.snapshots.length > 0) {
-    state.selectedBaselineId = state.snapshots[0].id || state.snapshots[0].title;
-  }
-  // Setup accessible main tabs
-  if (dom.mainNavTabs) {
-    setupAccessibleTabs(dom.mainNavTabs, (tabId) => {
-      announceToScreenReader(`Switched to tab: ${tabId.replace('tab-', '')}`);
-    });
-  }
-  // Setup accessible persona tabs
-  if (dom.personaTabs) {
-    setupAccessibleTabs(dom.personaTabs, (tabId) => {
-      const roleMap = {
-        'tab-ward-officer': 'ward_officer',
-        'tab-gig-worker': 'gig_worker',
-        'tab-housing-society': 'housing_society',
-        'tab-school': 'school'
-      };
-      state.activePersonaRole = roleMap[tabId] || 'ward_officer';
-      renderPersonaPanels(dom.personaContainer, state.personaActions, state.activePersonaRole);
-    });
-  }
-  // Setup accessible advisory track tabs (Dual Track)
-  if (dom.advisoryTrackTabs) {
-    setupAccessibleTabs(dom.advisoryTrackTabs, (tabId) => {
-      state.activeTrackView = tabId === 'tab-technical-track' ? 'technical' : 'citizen';
-      renderAdvisoryStudio(dom.advisoryContainer, state.briefingResult, state.activeTrackView);
-    });
-  }
-  // Quick 1-Click Preset Buttons Bar
-  const presetChips = document.querySelectorAll('.preset-chip');
-  presetChips.forEach((chip) => {
-    chip.addEventListener('click', (e) => {
-      presetChips.forEach((c) => c.classList.remove('active'));
-      chip.classList.add('active');
-      const presetKey = chip.getAttribute('data-preset');
-      if (DEMO_DATASETS[presetKey]) {
-        state.rawText = DEMO_DATASETS[presetKey];
-        if (dom.rawInput) dom.rawInput.value = state.rawText;
-        processCurrentData();
-        showToast(`Loaded ${chip.textContent.trim()} dataset!`, '⚡');
-      }
-    });
-  });
-  // Download Sample CSV Button
-  const btnDownloadSample = document.getElementById('btn-download-sample');
-  if (btnDownloadSample) {
-    btnDownloadSample.addEventListener('click', downloadSampleFile);
-  }
-  // Drag and drop ingestion setup
-  setupDropZone(dom.dropZone, (fileContent, fileName) => {
-    state.rawText = fileContent;
-    if (dom.rawInput) dom.rawInput.value = fileContent;
-    processCurrentData();
-    showToast(`Ingested file: ${fileName || 'Dataset'}`, '📁');
-  });
-  // File input change
-  if (dom.fileInput) {
-    dom.fileInput.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        readFile(file, (content, name) => {
-          state.rawText = content;
-          if (dom.rawInput) dom.rawInput.value = content;
-          processCurrentData();
-          showToast(`Loaded ${name}`, '📁');
-        });
-      }
-    });
-  }
-  // Process Ingestion Button
-  if (dom.btnIngest) {
-    dom.btnIngest.addEventListener('click', () => {
-      if (dom.rawInput) state.rawText = dom.rawInput.value;
-      processCurrentData();
-      showToast('Sensor readings analyzed and normalized!', '🚀');
-    });
-  }
-  // Generate Briefing Button
-  if (dom.btnGenerateBriefing) {
-    dom.btnGenerateBriefing.addEventListener('click', () => {
-      processCurrentData();
-      showToast('Advisory regenerated with latest metrics!', '✨');
-    });
-  }
-  // Reading Level Select
-  if (dom.readingLevelSelect) {
-    dom.readingLevelSelect.addEventListener('change', (e) => {
-      state.readingLevel = e.target.value;
-      processCurrentData();
-      showToast(`Advisory updated for: ${e.target.options[e.target.selectedIndex].text}`, '🎯');
-    });
-  }
-  // Language Select
-  if (dom.langSelect) {
-    dom.langSelect.addEventListener('change', (e) => {
-      state.language = e.target.value;
-      processCurrentData();
-      showToast(`Translated to ${e.target.options[e.target.selectedIndex].text}`, '🌐');
-    });
-  }
-  // Initial render (in case there is default data)
-  renderAllViews();
-}
 
-  const dom = getDOMElements();
-  // Populate city selector
-  populateCitySelect(dom.citySelect);
-  // Load preferences (theme)
+  // Load preferences (Theme)
   const prefs = loadPreferences();
-  if (prefs && prefs.theme === 'dark') {
+  if (prefs?.theme === 'dark') {
     document.documentElement.classList.add('dark-theme');
     document.body.classList.add('dark-theme');
     if (dom.themeToggleBtn) {
@@ -352,149 +213,30 @@ function initializeApp() {
     }
   }
 
-  if (dom.themeToggleBtn) {
-    dom.themeToggleBtn.addEventListener('click', () => {
-      const isDark = document.documentElement.classList.toggle('dark-theme');
-      document.body.classList.toggle('dark-theme');
-      // Persist preference
-      const newTheme = isDark ? 'dark' : 'light';
-      const newPrefs = { ...(prefs || {}), theme: newTheme };
-      savePreferences(newPrefs);
-      dom.themeToggleBtn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-    });
-  }
-  // Load snapshots
-  state.snapshots = loadSnapshots();
-  if (state.snapshots.length > 0) {
-    state.selectedBaselineId = state.snapshots[0].id || state.snapshots[0].title;
-  }
-  // Setup accessible main tabs
-  if (dom.mainNavTabs) {
-    setupAccessibleTabs(dom.mainNavTabs, (tabId) => {
-      announceToScreenReader(`Switched to tab: ${tabId.replace('tab-', '')}`);
-    });
-  }
-  // Setup accessible persona tabs
-  if (dom.personaTabs) {
-    setupAccessibleTabs(dom.personaTabs, (tabId) => {
-      const roleMap = {
-        'tab-ward-officer': 'ward_officer',
-        'tab-gig-worker': 'gig_worker',
-        'tab-housing-society': 'housing_society',
-        'tab-school': 'school'
-      };
-      state.activePersonaRole = roleMap[tabId] || 'ward_officer';
-      renderPersonaPanels(dom.personaContainer, state.personaActions, state.activePersonaRole);
-    });
-  }
-  // Setup accessible advisory track tabs (Dual Track)
-  if (dom.advisoryTrackTabs) {
-    setupAccessibleTabs(dom.advisoryTrackTabs, (tabId) => {
-      state.activeTrackView = tabId === 'tab-technical-track' ? 'technical' : 'citizen';
-      renderAdvisoryStudio(dom.advisoryContainer, state.briefingResult, state.activeTrackView);
-    });
-  }
-  // Quick 1-Click Preset Buttons Bar
-  const presetChips = document.querySelectorAll('.preset-chip');
-  presetChips.forEach((chip) => {
-    chip.addEventListener('click', (e) => {
-      presetChips.forEach((c) => c.classList.remove('active'));
-      chip.classList.add('active');
-      const presetKey = chip.getAttribute('data-preset');
-      if (DEMO_DATASETS[presetKey]) {
-        state.rawText = DEMO_DATASETS[presetKey];
-        if (dom.rawInput) dom.rawInput.value = state.rawText;
-        processCurrentData();
-        showToast(`Loaded ${chip.textContent.trim()} dataset!`, '⚡');
-      }
-    });
-  });
-  // Download Sample CSV Button
-  const btnDownloadSample = document.getElementById('btn-download-sample');
-  if (btnDownloadSample) {
-    btnDownloadSample.addEventListener('click', downloadSampleFile);
-  }
-  // Drag and drop ingestion setup
-  setupDropZone(dom.dropZone, (fileContent, fileName) => {
-    state.rawText = fileContent;
-    if (dom.rawInput) dom.rawInput.value = fileContent;
-    processCurrentData();
-    showToast(`Ingested file: ${fileName || 'Dataset'}`, '📁');
-  });
-  // File input change
-  if (dom.fileInput) {
-    dom.fileInput.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        readFile(file, (content, name) => {
-          state.rawText = content;
-          if (dom.rawInput) dom.rawInput.value = content;
-          processCurrentData();
-          showToast(`Loaded ${name}`, '📁');
-        });
-      }
-    });
-  }
-  // Process Ingestion Button
-  if (dom.btnIngest) {
-    dom.btnIngest.addEventListener('click', () => {
-      if (dom.rawInput) state.rawText = dom.rawInput.value;
-      processCurrentData();
-      showToast('Sensor readings analyzed and normalized!', '🚀');
-    });
-  }
-  // Generate Briefing Button
-  if (dom.btnGenerateBriefing) {
-    dom.btnGenerateBriefing.addEventListener('click', () => {
-      processCurrentData();
-      showToast('Advisory regenerated with latest metrics!', '✨');
-    });
-  }
-  // Reading Level Select
-  if (dom.readingLevelSelect) {
-    dom.readingLevelSelect.addEventListener('change', (e) => {
-      state.readingLevel = e.target.value;
-      processCurrentData();
-      showToast(`Advisory updated for: ${e.target.options[e.target.selectedIndex].text}`, '🎯');
-    });
-  }
-  // Language Select
-  if (dom.langSelect) {
-    dom.langSelect.addEventListener('change', (e) => {
-      state.language = e.target.value;
-      processCurrentData();
-      showToast(`Translated to ${e.target.options[e.target.selectedIndex].text}`, '🌐');
-    });
-  }
-  // Initial render (in case there is default data)
-  renderAllViews();
-}
-
-  const dom = getDOMElements();
-  // Populate city selector
-  populateCitySelect(dom.citySelect);
-  // Listen for city selection
+  // Populate city selector dropdown
   if (dom.citySelect) {
+    populateCitySelect(dom.citySelect);
+
+    // City Selection Event Listener
     dom.citySelect.addEventListener('change', () => {
       const city = getSelectedCity(dom.citySelect);
       if (city) {
-        showToast(`Selected ${city.city} (Pincode ${city.pincode})`, '📍');
-        // Optionally, filter data based on city – placeholder for future logic
+        const cityData = getCityDataset(city.pincode);
+        if (cityData) {
+          state.rawText = cityData;
+          if (dom.rawInput) {
+            dom.rawInput.value = state.rawText;
+          }
+          // Deactivate custom presets
+          document.querySelectorAll('.preset-chip').forEach((c) => c.classList.remove('active'));
+          processCurrentData();
+          showToast(`Loaded live sensor records for ${city.city} (${city.pincode})`, '📍');
+        }
       }
     });
   }
-  // Load preferences
-  const prefs = loadPreferences();
-  const dom = getDOMElements();
 
-  // Load preferences
-  const prefs = loadPreferences();
-  if (prefs.theme === 'dark') {
-    document.documentElement.classList.add('dark-theme');
-    document.body.classList.add('dark-theme');
-  }
-
-  // Load snapshots
+  // Load saved snapshots
   state.snapshots = loadSnapshots();
   if (state.snapshots.length > 0) {
     state.selectedBaselineId = state.snapshots[0].id || state.snapshots[0].title;
@@ -532,9 +274,11 @@ function initializeApp() {
   // Quick 1-Click Preset Buttons Bar
   const presetChips = document.querySelectorAll('.preset-chip');
   presetChips.forEach((chip) => {
-    chip.addEventListener('click', (e) => {
+    chip.addEventListener('click', () => {
       presetChips.forEach((c) => c.classList.remove('active'));
       chip.classList.add('active');
+      if (dom.citySelect) dom.citySelect.value = '';
+
       const presetKey = chip.getAttribute('data-preset');
       if (DEMO_DATASETS[presetKey]) {
         state.rawText = DEMO_DATASETS[presetKey];
@@ -622,7 +366,7 @@ function initializeApp() {
     });
   }
 
-  // Save Snapshot Button (Clean inline modal/toast, no ugly prompt)
+  // Save Snapshot Button
   if (dom.btnSaveSnapshot) {
     dom.btnSaveSnapshot.addEventListener('click', () => {
       if (!state.processedData) return;
@@ -743,9 +487,20 @@ function initializeApp() {
       document.documentElement.classList.toggle('dark-theme');
       dom.themeToggleBtn.setAttribute('aria-pressed', String(isDark));
       savePreferences({ theme: isDark ? 'dark' : 'light' });
+      // Re-render chart so axes and colors adapt cleanly
+      if (state.processedData) {
+        renderChart(dom.aqiChart, state.processedData.stations);
+      }
       showToast(`Switched to ${isDark ? 'Dark' : 'Light'} theme`, '🌓');
     });
   }
+
+  // Redraw chart on window resize
+  window.addEventListener('resize', () => {
+    if (state.processedData && dom.aqiChart) {
+      renderChart(dom.aqiChart, state.processedData.stations);
+    }
+  });
 
   // Global delegation for Copy, Print, and Task Checkboxes
   document.addEventListener('click', (e) => {

@@ -425,3 +425,132 @@ export function renderSnapshotOptions(selectEl, snapshots, selectedId = null) {
     selectEl.appendChild(opt);
   });
 }
+
+/**
+ * Renders an interactive, high-DPI Ward AQI Bar Chart onto an HTML5 Canvas.
+ * Color-codes each bar according to official CPCB AQI bands.
+ *
+ * @param {HTMLCanvasElement} canvas - Target canvas element.
+ * @param {Array<Object>} stations - Processed sensor stations list.
+ */
+export function renderChart(canvas, stations) {
+  if (!canvas || typeof canvas.getContext !== 'function') return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+  const rect = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : { width: 800, height: 280 };
+  const width = rect.width > 0 ? rect.width : (canvas.width || 800);
+  const height = 280;
+
+  // Set real canvas dimensions for crisp high-DPI rendering
+  if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+  }
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  if (!stations || stations.length === 0) {
+    ctx.fillStyle = '#64748b';
+    ctx.font = '14px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No station records available. Ingest or select a city dataset to render chart.', width / 2, height / 2);
+    ctx.restore();
+    return;
+  }
+
+  // Layout parameters
+  const paddingLeft = 45;
+  const paddingRight = 20;
+  const paddingTop = 32;
+  const paddingBottom = 55;
+  const plotWidth = width - paddingLeft - paddingRight;
+  const plotHeight = height - paddingTop - paddingBottom;
+
+  const maxVal = Math.min(500, Math.max(300, ...stations.map((s) => s.aqi || 0)));
+
+  // Draw threshold horizontal grid lines
+  const thresholds = [
+    { val: 50, color: '#10b981', label: 'Good' },
+    { val: 100, color: '#84cc16', label: 'Sat' },
+    { val: 200, color: '#eab308', label: 'Mod' },
+    { val: 300, color: '#f97316', label: 'Poor' },
+    { val: 400, color: '#ef4444', label: 'V.Poor' }
+  ];
+
+  thresholds.forEach((th) => {
+    if (th.val <= maxVal) {
+      const y = paddingTop + plotHeight - (th.val / maxVal) * plotHeight;
+      ctx.beginPath();
+      ctx.strokeStyle = th.color + '40';
+      if (ctx.setLineDash) ctx.setLineDash([4, 4]);
+      ctx.moveTo(paddingLeft, y);
+      ctx.lineTo(width - paddingRight, y);
+      ctx.stroke();
+
+      ctx.fillStyle = th.color;
+      ctx.font = '10px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      if (ctx.setLineDash) ctx.setLineDash([]);
+      ctx.fillText(String(th.val), paddingLeft - 6, y + 3);
+    }
+  });
+
+  // Base axis line
+  ctx.beginPath();
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 1;
+  if (ctx.setLineDash) ctx.setLineDash([]);
+  ctx.moveTo(paddingLeft, paddingTop + plotHeight);
+  ctx.lineTo(width - paddingRight, paddingTop + plotHeight);
+  ctx.stroke();
+
+  // Draw Bars
+  const count = stations.length;
+  const barGap = Math.max(12, plotWidth / (count * 4));
+  const barWidth = Math.min(60, Math.max(24, (plotWidth - barGap * (count + 1)) / count));
+  const totalBarsWidth = count * barWidth + (count - 1) * barGap;
+  const startX = paddingLeft + (plotWidth - totalBarsWidth) / 2;
+
+  stations.forEach((st, idx) => {
+    const aqi = Math.max(0, st.aqi || 0);
+    const barHeight = Math.max(4, (aqi / maxVal) * plotHeight);
+    const x = startX + idx * (barWidth + barGap);
+    const y = paddingTop + plotHeight - barHeight;
+    const bandColor = st.band?.color || '#10b981';
+
+    // Bar fill with rounded top
+    ctx.fillStyle = bandColor;
+    const radius = Math.min(6, barWidth / 2);
+    ctx.beginPath();
+    ctx.moveTo(x, y + radius);
+    ctx.arcTo(x, y, x + radius, y, radius);
+    ctx.arcTo(x + barWidth, y, x + barWidth, y + radius, radius);
+    ctx.lineTo(x + barWidth, paddingTop + plotHeight);
+    ctx.lineTo(x, paddingTop + plotHeight);
+    ctx.closePath();
+    ctx.fill();
+
+    // AQI text on top of bar
+    ctx.fillStyle = bandColor;
+    ctx.font = 'bold 12px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(aqi), x + barWidth / 2, Math.max(16, y - 6));
+
+    // Ward name underneath bar
+    const rawName = st.ward || st.stationId || `Ward ${idx + 1}`;
+    const truncatedName = rawName.length > 12 ? rawName.slice(0, 10) + '…' : rawName;
+    ctx.fillStyle = '#475569';
+    ctx.font = '11px Inter, system-ui, sans-serif';
+    ctx.fillText(truncatedName, x + barWidth / 2, paddingTop + plotHeight + 16);
+
+    // Dominant pollutant tag
+    ctx.fillStyle = '#64748b';
+    ctx.font = '9px Inter, monospace';
+    ctx.fillText(st.dominantPollutant || 'PM2.5', x + barWidth / 2, paddingTop + plotHeight + 30);
+  });
+
+  ctx.restore();
+}

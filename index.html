@@ -66,26 +66,8 @@
           <strong>Ward Officers</strong>, <strong>Gig Delivery Fleets</strong>, <strong>Schools</strong>, and <strong>Communities</strong>.
         </p>
 
-        <!-- Quick-Start Demo Bar -->
+        <!-- Quick-Start Demo Bar & City Selector -->
         <div class="quick-preset-bar" role="group" aria-label="Quick Load Datasets">
-            <span class="quick-preset-label">⚡ 1-Click Demo Datasets:</span>
-            <button type="button" class="preset-chip active" data-preset="cleanCsv">
-              <span class="chip-dot dot-emerald"></span> Clean Standard CSV
-            </button>
-            <button type="button" class="preset-chip" data-preset="messyTsv">
-              <span class="chip-dot dot-amber"></span> Messy TSV &amp; Gaps
-            </button>
-            <button type="button" class="preset-chip" data-preset="mixedUnits">
-              <span class="chip-dot dot-blue"></span> Mixed Units (ppm/mg)
-            </button>
-            <button type="button" class="preset-chip" data-preset="markdownTable">
-              <span class="chip-dot dot-purple"></span> Markdown Table
-            </button>
-            <!-- City selector -->
-            <select id="city-select" class="city-select" aria-label="Select City by Pincode">
-              <option value="" disabled selected>Select City</option>
-            </select>
-          </div>
           <span class="quick-preset-label">⚡ 1-Click Demo Datasets:</span>
           <button type="button" class="preset-chip active" data-preset="cleanCsv">
             <span class="chip-dot dot-emerald"></span> Clean Standard CSV
@@ -99,6 +81,11 @@
           <button type="button" class="preset-chip" data-preset="markdownTable">
             <span class="chip-dot dot-purple"></span> Markdown Table
           </button>
+          <div class="city-select-wrapper">
+            <select id="city-select" class="form-select city-select" aria-label="Select Indian City by Pincode">
+              <option value="" disabled selected>📍 Select City / Pincode...</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -148,6 +135,27 @@
     <section class="kpi-section" aria-label="Executive Key Performance Indicators">
       <div id="kpi-container" class="kpi-grid">
         <!-- Rendered dynamically by ui-renderers.js -->
+      </div>
+    </section>
+
+    <!-- Real-Time Ward Pollution & AQI Distribution Chart -->
+    <section class="chart-section card" aria-labelledby="chart-heading">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2 id="chart-heading" class="card-title">📈 Real-Time Ward Pollution &amp; AQI Distribution</h2>
+          <p class="card-subtitle">Visual comparative air quality index with statutory CPCB threshold classification</p>
+        </div>
+        <div class="chart-legend-row" aria-hidden="true">
+          <span class="legend-item"><span class="legend-color dot-emerald"></span> Good (0-50)</span>
+          <span class="legend-item"><span class="legend-color dot-lime"></span> Satisfactory (51-100)</span>
+          <span class="legend-item"><span class="legend-color dot-amber"></span> Moderate (101-200)</span>
+          <span class="legend-item"><span class="legend-color dot-orange"></span> Poor (201-300)</span>
+          <span class="legend-item"><span class="legend-color dot-red"></span> Very Poor (301-400)</span>
+          <span class="legend-item"><span class="legend-color dot-maroon"></span> Severe (401-500)</span>
+        </div>
+      </div>
+      <div class="card-body chart-card-body">
+        <canvas id="aqi-chart" class="aqi-chart-canvas" width="900" height="280" role="img" aria-label="Ward AQI Bar Chart with CPCB categories"></canvas>
       </div>
     </section>
 
