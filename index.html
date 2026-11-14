@@ -68,6 +68,24 @@
 
         <!-- Quick-Start Demo Bar -->
         <div class="quick-preset-bar" role="group" aria-label="Quick Load Datasets">
+            <span class="quick-preset-label">⚡ 1-Click Demo Datasets:</span>
+            <button type="button" class="preset-chip active" data-preset="cleanCsv">
+              <span class="chip-dot dot-emerald"></span> Clean Standard CSV
+            </button>
+            <button type="button" class="preset-chip" data-preset="messyTsv">
+              <span class="chip-dot dot-amber"></span> Messy TSV &amp; Gaps
+            </button>
+            <button type="button" class="preset-chip" data-preset="mixedUnits">
+              <span class="chip-dot dot-blue"></span> Mixed Units (ppm/mg)
+            </button>
+            <button type="button" class="preset-chip" data-preset="markdownTable">
+              <span class="chip-dot dot-purple"></span> Markdown Table
+            </button>
+            <!-- City selector -->
+            <select id="city-select" class="city-select" aria-label="Select City by Pincode">
+              <option value="" disabled selected>Select City</option>
+            </select>
+          </div>
           <span class="quick-preset-label">⚡ 1-Click Demo Datasets:</span>
           <button type="button" class="preset-chip active" data-preset="cleanCsv">
             <span class="chip-dot dot-emerald"></span> Clean Standard CSV

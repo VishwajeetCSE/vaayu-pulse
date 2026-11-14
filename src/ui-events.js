@@ -67,7 +67,8 @@ export function getDOMElements() {
     apiKeyStatusBadge: document.getElementById('apikey-status-badge'),
 
     // General
-    themeToggleBtn: document.getElementById('theme-toggle-btn')
+    themeToggleBtn: document.getElementById('theme-toggle-btn'),
+    citySelect: document.getElementById('city-select')
   };
 }
 
