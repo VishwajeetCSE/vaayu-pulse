@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Civic Air Quality Briefing Studio: Production-grade environmental intelligence platform featuring messy data ingestion, persona-tailored action checklists, delta comparison, and hybrid GenAI advisories.">
+  <title>Civic Air Quality Briefing Studio</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Accessible Skip Navigation Link -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Screen Reader Live Announcements Region -->
+  <div id="sr-announcer" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+  <!-- Header & Civic Branding -->
+  <header class="app-header" role="banner">
+    <div class="header-container">
+      <div class="branding">
+        <div class="brand-logo" aria-hidden="true">🍃</div>
+        <div>
+          <h1 class="brand-title">Civic Air Quality Briefing Studio</h1>
+          <p class="brand-subtitle">Environmental Governance &amp; Multi-Tier Citizen Advisory Engine</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="badge badge-blue cursor-pointer" id="apikey-status-badge" aria-label="Configure Gemini API Key">
+          ⚡ Offline AI Active
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-open-apikey-modal" aria-haspopup="dialog" aria-label="Open GenAI Settings Modal">
+          ⚙️ AI Config
+        </button>
+        <button type="button" class="btn btn-icon btn-sm" id="theme-toggle-btn" aria-label="Toggle light and dark display theme" aria-pressed="false">
+          🌓
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main id="main-content" class="main-layout" role="main">
+    
+    <!-- Executive KPI Row -->
+    <section class="kpi-section" aria-label="Executive Key Performance Indicators">
+      <div id="kpi-container" class="kpi-grid">
+        <!-- Rendered dynamically by ui-renderers.js -->
+      </div>
+    </section>
+
+    <!-- Data Ingestion Studio -->
+    <section class="ingestion-section card" aria-labelledby="ingestion-heading">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2 id="ingestion-heading" class="card-title">1. Messy Data Ingestion Engine</h2>
+          <span class="card-subtitle">Accepts messy CSV, TSV, JSON, Markdown tables with automatic unit conversion and anomaly flagging</span>
+        </div>
+        <div class="ingestion-presets">
+          <label for="sample-data-select" class="control-label">Load Test Dataset:</label>
+          <select id="sample-data-select" class="form-select form-select-sm">
+            <option value="cleanCsv">Clean Standard CSV</option>
+            <option value="messyTsv">Messy TSV with Missing Values</option>
+            <option value="mixedUnits">Mixed Units (ppm vs µg/m³)</option>
+            <option value="markdownTable">Markdown Delimited Table</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="ingestion-grid">
+          <div class="input-panel">
+            <label for="raw-input" class="sr-only">Raw Air Quality Sensor Data Input</label>
+            <textarea id="raw-input" class="raw-textarea" rows="7" placeholder="Paste CSV, TSV, Markdown table, or JSON sensor readings here..."></textarea>
+            
+            <div class="input-action-bar">
+              <button type="button" class="btn btn-primary" id="btn-ingest">
+                🚀 Normalize &amp; Analyze Data
+              </button>
+              <button type="button" class="btn btn-secondary" id="btn-export-json">
+                💾 Export Briefing JSON
+              </button>
+            </div>
+          </div>
+
+          <div class="upload-panel">
+            <div id="drop-zone" class="drop-zone" tabindex="0" role="region" aria-label="File upload drop area">
+              <div class="drop-icon" aria-hidden="true">📁</div>
+              <p class="drop-text">Drag &amp; drop data file here (.csv, .tsv, .txt, .json)</p>
+              <label for="file-input" class="btn btn-outline btn-sm">
+                Browse File
+                <input type="file" id="file-input" class="sr-only" accept=".csv,.tsv,.txt,.json">
+              </label>
+              <p class="drop-subtext">Max size: 5 MB | Memory-only parsing</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="studio-navigation mt-4" aria-label="Briefing Studio Sections">
+      <div id="main-nav-tabs" class="tablist" role="tablist" aria-label="Studio Modules">
+        <button type="button" id="tab-data-table" class="tab-button" role="tab" aria-selected="true" aria-controls="panel-data-table" tabindex="0">
+          📋 Sensor Readings &amp; Anomaly Audit
+        </button>
+        <button type="button" id="tab-persona-actions" class="tab-button" role="tab" aria-selected="false" aria-controls="panel-persona-actions" tabindex="-1">
+          🛡️ Persona Action Engine
+        </button>
+        <button type="button" id="tab-delta-view" class="tab-button" role="tab" aria-selected="false" aria-controls="panel-delta-view" tabindex="-1">
+          📊 What Changed (Delta Comparison)
+        </button>
+        <button type="button" id="tab-advisory-studio" class="tab-button" role="tab" aria-selected="false" aria-controls="panel-advisory-studio" tabindex="-1">
+          📢 Citizen Advisory Studio
+        </button>
+      </div>
+    </nav>
+
+    <!-- Tab Panels Container -->
+    <div class="tab-panels-wrapper">
+      
+      <!-- Panel 1: Data Table & Anomaly Audit -->
+      <section id="panel-data-table" class="tab-panel" role="tabpanel" aria-labelledby="tab-data-table">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Normalized Sensor Station Records</h2>
+              <p class="card-subtitle">Standardized CPCB/EPA sub-indices with automated anomaly &amp; gap identification</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="data-table-container">
+              <!-- Rendered by ui-renderers.js -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 2: Persona Action Recommendation Engine -->
+      <section id="panel-persona-actions" class="tab-panel" role="tabpanel" aria-labelledby="tab-persona-actions" hidden>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">2. Persona-Tailored Action Recommendation Engine</h2>
+              <p class="card-subtitle">Role-specific statutory intervention checklists with enforcement timelines</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- Persona Selector Tabs -->
+            <div id="persona-tabs" class="sub-tablist mb-3" role="tablist" aria-label="Intervention Persona Roles">
+              <button type="button" id="tab-ward-officer" class="sub-tab-btn" role="tab" aria-selected="true" aria-controls="persona-container" tabindex="0">
+                🏢 Ward Officers &amp; Engineers
+              </button>
+              <button type="button" id="tab-housing-society" class="sub-tab-btn" role="tab" aria-selected="false" aria-controls="persona-container" tabindex="-1">
+                🏘️ Housing Societies &amp; RWAs
+              </button>
+              <button type="button" id="tab-school" class="sub-tab-btn" role="tab" aria-selected="false" aria-controls="persona-container" tabindex="-1">
+                🏫 School Administrators
+              </button>
+            </div>
+
+            <div id="persona-container">
+              <!-- Rendered by ui-renderers.js -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 3: "What Changed" Delta Comparison -->
+      <section id="panel-delta-view" class="tab-panel" role="tabpanel" aria-labelledby="tab-delta-view" hidden>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">3. Brief Delta Comparison ("What Changed")</h2>
+              <p class="card-subtitle">Compares current briefing against baseline snapshots to detect deteriorating or improving hotspots</p>
+            </div>
+            <div class="delta-controls">
+              <label for="baseline-snapshot-select" class="control-label">Baseline Snapshot:</label>
+              <select id="baseline-snapshot-select" class="form-select form-select-sm">
+                <!-- Populated dynamically -->
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-save-snapshot">
+                📸 Save Current Snapshot
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="delta-container">
+              <!-- Rendered by ui-renderers.js -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 4: Multi-Persona & Multi-Language Citizen Advisory Studio -->
+      <section id="panel-advisory-studio" class="tab-panel" role="tabpanel" aria-labelledby="tab-advisory-studio" hidden>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">4. Citizen Advisory &amp; Briefing Studio</h2>
+              <p class="card-subtitle">Dual-track generation with multi-reading levels and localized translations</p>
+            </div>
+
+            <!-- Studio Toolbar Controls -->
+            <div class="advisory-toolbar">
+              <div class="toolbar-group">
+                <label for="reading-level-select" class="control-label">Reading Level:</label>
+                <select id="reading-level-select" class="form-select form-select-sm">
+                  <option value="standard">Standard Citizen</option>
+                  <option value="simplified">Simplified (Child/Elementary)</option>
+                  <option value="vulnerable">Vulnerable Health Focus (Elderly, Asthma)</option>
+                </select>
+              </div>
+
+              <div class="toolbar-group">
+                <label for="language-select" class="control-label">Language:</label>
+                <select id="language-select" class="form-select form-select-sm">
+                  <option value="en">English</option>
+                  <option value="hi">हिंदी (Hindi)</option>
+                  <option value="bn">বাংলা (Bengali)</option>
+                  <option value="ta">தமிழ் (Tamil)</option>
+                  <option value="mr">मराठी (Marathi)</option>
+                  <option value="es">Español (Spanish)</option>
+                </select>
+              </div>
+
+              <button type="button" class="btn btn-primary btn-sm" id="btn-generate-briefing">
+                ✨ Regenerate Briefing
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- Dual Track Output Switcher -->
+            <div id="advisory-track-tabs" class="sub-tablist mb-3" role="tablist" aria-label="Advisory Track Selection">
+              <button type="button" id="tab-citizen-track" class="sub-tab-btn" role="tab" aria-selected="true" aria-controls="advisory-container" tabindex="0">
+                📢 Plain-Language Citizen Advisory
+              </button>
+              <button type="button" id="tab-technical-track" class="sub-tab-btn" role="tab" aria-selected="false" aria-controls="advisory-container" tabindex="-1">
+                📑 Technical Municipal Briefing Note
+              </button>
+            </div>
+
+            <div id="advisory-container">
+              <!-- Rendered by ui-renderers.js -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- API Key Modal Dialog (Memory-Only Ephemeral Security) -->
+  <div id="apikey-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title" class="modal-title">Hybrid GenAI Engine Configuration</h3>
+        <button type="button" class="btn-close" id="btn-close-apikey-modal" aria-label="Close modal window">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          The studio operates in <strong>Offline-First Heuristic Mode</strong> by default with zero external dependencies.
+          Optionally provide a Google Gemini API key to activate live generative briefings.
+        </p>
+        <div class="security-banner">
+          🔒 <strong>Zero Persistence Guarantee:</strong> Your API key is stored exclusively in ephemeral page memory. It is never written to localStorage, cookies, or any remote server.
+        </div>
+        <div class="form-group mt-3">
+          <label for="apikey-input" class="form-label">Google Gemini API Key (Optional):</label>
+          <input type="password" id="apikey-input" class="form-control" placeholder="AIzaSy..." autocomplete="off">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-clear-apikey">Purge from Memory</button>
+        <button type="button" class="btn btn-primary" id="btn-save-apikey">Save in Memory</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer" role="contentinfo">
+    <div class="footer-container">
+      <p>Built for <strong>Hack2Skill Build with AI: PromptWars</strong> | Designed to WCAG 2.1 AA &amp; CPCB Environmental Governance Standards.</p>
+      <p class="footer-credits">Zero external runtime dependencies • ES2022 Native Modules • Memory-Only Vault Security</p>
+    </div>
+  </footer>
+
+  <!-- Application Entrypoint -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
