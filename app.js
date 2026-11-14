@@ -304,41 +304,72 @@ function initializeApp() {
     });
   }
 
-  // API Key Modal Handling (Memory-Only)
+  // API Key Modal Handling (Memory-Only & Multi-Trigger Dismissal)
+  const openApiKeyModal = () => {
+    if (dom.apiKeyModal) {
+      dom.apiKeyModal.removeAttribute('hidden');
+      dom.apiKeyModal.style.setProperty('display', 'flex', 'important');
+      trapFocus(dom.apiKeyModal, dom.apiKeyInput);
+    }
+  };
+
+  const closeApiKeyModal = () => {
+    if (dom.apiKeyModal) {
+      dom.apiKeyModal.setAttribute('hidden', 'true');
+      dom.apiKeyModal.style.setProperty('display', 'none', 'important');
+      releaseFocus();
+    }
+  };
+
   if (dom.btnOpenApiKeyModal) {
-    dom.btnOpenApiKeyModal.addEventListener('click', () => {
-      if (dom.apiKeyModal) {
-        dom.apiKeyModal.removeAttribute('hidden');
-        dom.apiKeyModal.style.display = 'flex';
-        trapFocus(dom.apiKeyModal, dom.apiKeyInput);
-      }
-    });
+    dom.btnOpenApiKeyModal.addEventListener('click', openApiKeyModal);
+  }
+  if (dom.apiKeyStatusBadge) {
+    dom.apiKeyStatusBadge.addEventListener('click', openApiKeyModal);
   }
 
   if (dom.btnCloseApiKeyModal) {
-    dom.btnCloseApiKeyModal.addEventListener('click', () => {
-      if (dom.apiKeyModal) {
-        dom.apiKeyModal.setAttribute('hidden', 'true');
-        dom.apiKeyModal.style.display = 'none';
-        releaseFocus();
+    dom.btnCloseApiKeyModal.addEventListener('click', closeApiKeyModal);
+  }
+
+  // Click outside backdrop to close
+  if (dom.apiKeyModal) {
+    dom.apiKeyModal.addEventListener('click', (e) => {
+      if (e.target === dom.apiKeyModal) {
+        closeApiKeyModal();
       }
     });
   }
 
+  // Escape key to close modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && dom.apiKeyModal && dom.apiKeyModal.style.display !== 'none') {
+      closeApiKeyModal();
+    }
+  });
+
+  const handleSaveApiKey = () => {
+    const key = dom.apiKeyInput?.value?.trim();
+    if (key) {
+      setApiKey(key);
+      announceToScreenReader('Gemini API key loaded into ephemeral memory.');
+    }
+    closeApiKeyModal();
+    updateApiKeyBadge();
+    processCurrentData();
+  };
+
   if (dom.btnSaveApiKey) {
-    dom.btnSaveApiKey.addEventListener('click', () => {
-      const key = dom.apiKeyInput?.value?.trim();
-      if (key) {
-        setApiKey(key);
-        announceToScreenReader('Gemini API key loaded into ephemeral memory.');
+    dom.btnSaveApiKey.addEventListener('click', handleSaveApiKey);
+  }
+
+  // Allow pressing Enter key in input field to save
+  if (dom.apiKeyInput) {
+    dom.apiKeyInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSaveApiKey();
       }
-      if (dom.apiKeyModal) {
-        dom.apiKeyModal.setAttribute('hidden', 'true');
-        dom.apiKeyModal.style.display = 'none';
-        releaseFocus();
-      }
-      updateApiKeyBadge();
-      processCurrentData();
     });
   }
 
@@ -348,11 +379,7 @@ function initializeApp() {
       if (dom.apiKeyInput) dom.apiKeyInput.value = '';
       announceToScreenReader('Gemini API key purged from memory.');
       updateApiKeyBadge();
-      if (dom.apiKeyModal) {
-        dom.apiKeyModal.setAttribute('hidden', 'true');
-        dom.apiKeyModal.style.display = 'none';
-        releaseFocus();
-      }
+      closeApiKeyModal();
       processCurrentData();
     });
   }
